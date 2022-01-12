@@ -1,0 +1,563 @@
+---
+title: "Experimental enforcement of sex-limited adaptation"
+author: "Thomas Keaney"
+#bibliography: "supp_references.bib"
+output:
+  html_document:
+    code_folding: hide
+    depth: 1
+    number_sections: no
+    theme: yeti
+    toc: yes
+    toc_float: yes
+    code_download: true
+editor_options:
+  chunk_output_type: console
+---
+
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = FALSE)
+```
+
+# Setup for analysis
+
+## Load packages
+
+```{r}
+library(tidyverse) # tidy style coding
+library(brms) # Bayesian models
+library(loo) # to use information criteria in brms models
+library(tidybayes) # Bayesian aesthetics
+library(MetBrewer) # colours
+library(kableExtra) # tables
+library(patchwork) # putting plots together
+library(DT) # for search- and saveable tables
+library(pander) # for simpler tables
+```
+
+## Load in the data 
+
+$~$
+
+```{r}
+
+fitness_data <- read_csv("data/SLC_fitness_data.csv") %>% 
+  mutate(Fitness_vial_ID = as.factor(Fitness_vial_ID),
+         Block = as.factor(Block),
+         Population = as.factor(Population),
+         Treatment = as.factor(Treatment),
+         GFP = as.factor(GFP),
+         Sex = as.factor(Sex),
+         Rearing_vial = as.factor(Rearing_vial),
+         Sex = as.factor(Sex),
+         Total_red_offspring = Red_female_offspring + Red_male_offspring,
+         Total_bw_offspring = bw_female_offspring + bw_male_offspring,
+         Total_offspring = Total_red_offspring + Total_bw_offspring)
+
+# Create a function to build HTML searchable tables
+
+my_data_table <- function(df){
+  datatable(
+    df, rownames=FALSE,
+    autoHideNavigation = TRUE,
+    extensions = c("Scroller",  "Buttons"),
+    options = list(
+      dom = 'Bfrtip',
+      deferRender=TRUE,
+      scrollX=TRUE, scrollY=400,
+      scrollCollapse=TRUE,
+      buttons =
+        list('pageLength', 'colvis', 'csv', list(
+          extend = 'pdf',
+          pageSize = 'A4',
+          orientation = 'landscape',
+          filename = 'fitness_data')),
+      pageLength = 692
+    )
+  )
+}
+
+
+my_data_table(fitness_data %>% select(-Comment))
+
+```
+
+**Column explanations**
+
+$~$
+
+Fitness_vial_ID: a unique identifier for each replicate of the fitness assays.
+
+Block: the experiment was run in three distinct blocks, using flies from separate generations.
+
+Population: we measured the fitness of flies from 12 independent populations that has undergone experimental evolution.
+
+Treatment: the populations had been exposed to one of three evolutionary conditions for 20 generations: a female-limited response to selection, a male-limited response and a control condition where the evolutionary response was unconstrained.
+
+GFP: the GFP marker carried by the population. UBI indicates the presence of a transgene that encodes ubiquitous expression of GFP, while 3xP indicates the presence of a different transgene that encodes the expression of GFP in the ocelli. 
+
+Sex: the sex of the individuals that we were measuring the fitness of.
+
+Rearing_vial: the vial the flies developed in. This variable is included to capture variation explained by the rearing environment e.g. small differences in food moisture content or quantity. Note that females and males can have the same rearing vial.
+
+Red_female_offspring: the number of adult female offspring sired/produced by flies sourced from one of the 12 populations.
+
+Red_male_offspring: the number of adult male offspring sired/produced by flies sourced from one of the 12 populations.
+
+bw_female_offspring: the number of adult female offspring sired/produced by the competitor flies in our fitness assay. _bw_ is a recessive allele that encodes brown eye colour.
+
+bw_male_offspring: the number of adult male offspring sired/produced by the competitor flies in our fitness assay. _bw_ is a recessive allele that encodes brown eye colour.
+
+Total_red_offspring: the total number (sexes pooled) of adult offspring sired/produced by flies sourced from one of the 12 populations.
+
+Total_bw_offspring: the total number (sexes pooled) of adult offspring sired/produced by competitor flies.
+
+Total_offspring: the total number (sexes and eye colours pooled) of adult offspring counted in each vial.
+
+
+$~$
+
+# Modelling approach
+
+$~$
+
+Female and male fitness are fundamentally different concepts / traits. Therefore, we choose to split the data up and model them separately.
+
+```{r}
+female_fitness <- 
+  fitness_data %>%
+  filter(Sex == "Female")
+
+male_fitness <- 
+  fitness_data %>%
+  filter(Sex == "Male")
+  
+```
+
+
+Note that, while the female and male fitness assays are very similar, they do differ. The major difference is that the male assay contains half the number of females in any given vial than does the female assay. The logic behind this design choice is that sexual selection is a more important part of male fitness than it is female fitness, so any fitness differences may only be observed when competition for fertilisations is high.
+
+**Playing devils advocate with my chosen approach**: one reason why we might want to keep all the data together is that the `Rearing_vial` variable is shared between the fitness datasets. That is, females included in the female fitness assay developed alongside males that were included in the male fitness assay. Keeping the data as one therefore gives us greater power for estimating the effect of rearing vial on fitness. 
+
+**Variables we can include in our models**
+
+`Block` and `Rearing_vial`: technically, `Rearing_vial` can be nested inside `Block`. Both explain variation in the data caused by the way we designed our experiment. We have greater power to estimate block effects, because the number of fitness assays conducted within a block is much larger than the number of fitness assays conducted per rearing vial. However, the block effect might miss fine scale variance that might be important to account for. Blocks also contain data from all GFP and evolution treatment levels, while rearing vials only contain flies from specific populations and GFP types.
+
+`GFP`: it is possible that fitness may be affected by the GFP transgene carried by each population. For example, one could imagine that any unintended fitness effects of a transgene might be of greater magnitude if it is expressed in a larger proportion of tissues, as is the case for the _UBI_ transgene versus the _3xP_ transgene.
+
+`Treatment`: this is the evolution treatment that populations were subject to for 20 generations. There are three levels: populations carrying female-adapted chromosomes, populations containing male-adapted chromosomes and populations carrying control chromosomes that have experienced an unlimited response to selection. This variable is central to our hypothesis.
+
+`Population`: our design contained 12 independent populations that originated from a single outbred laboratory population. The populations were split and each was subjected to one of the three evolution treatments for 20 generations. 4 populations experienced a female-limited response to selection, 4 a male-limited response and 4 an unlimited response. 
+
+$~$
+
+# Female fitness
+
+$~$
+
+To estimate the fitness of females carrying each of the three chromosome types, we placed three experimental females into a yeasted vial with three female competitors that carried the _bw_ mutation. We then introduced six males that also carried the _bw_ mutation. We allowed them to mate and oviposit for three days, then removed all adults from the vial. 12 days later we counted all of the adult progeny in the vial and scored them for eye-colour. Progeny with red eyes were produced by the experimental females ( _bw_ is recessive) and progeny with brown eyes were produced by the competitor females. We calculated fitness as the proportion of red eyed offspring in the vial. 
+
+$~$
+
+Let's start with a simple model. We'll specify the binomial family, set priors and include `Rearing_vial` as a random effect. This simply accounts for potential sources of variance stemming from the way we designed our fly lines and our fitness assays. While they are not interesting per se in regards to our hypothesis, they need to be accounted for, as they may mask an effect of the variables we are principally investigating.
+
+```{r}
+female_fitness.01 <-
+  brm(Total_red_offspring | trials(Total_offspring) ~ 1 + (1|Rearing_vial),
+      data = female_fitness, family = binomial(), 
+      prior = c(prior(normal(0, 1.5), class = Intercept),
+                #prior(normal(0, 2), class = b),
+                prior(exponential(1), class = sd)),
+      iter = 6000, warmup = 2000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.9, max_treedepth = 10),
+      seed = 2, file = "Fits/female_fitness.01")
+
+#add_criterion(female_fitness.01, criterion = "waic")
+
+```
+
+To see if we're on the right track with our model, let's perform a posterior predictive check. From our model we predict values and build a distribution. If the shape of the distribution matches the raw data reasonably well, we can be confident that we have specified an appropriate error distribution.
+
+```{r}
+pp_check(female_fitness.01, type = "hist", ndraws = 11, binwidth = 10) +
+  theme_minimal() +
+  theme(panel.background = element_blank())
+```
+
+Now we can visualise our predictions for each rearing vial.
+
+```{r}
+
+# get draws from the posterior distribution
+
+draws <- as_draws_df(female_fitness.01)
+
+# wrangle the data to get relevant predictions
+
+draws_rearing_vials <- 
+  coef(female_fitness.01, robust = T)$Rearing_vial[, , ] %>% 
+  as_tibble(rownames = NA) %>% 
+  rownames_to_column("Rearing_vial") %>% 
+  mutate(Estimate = inv_logit_scaled(Estimate),
+         Q2.5 = inv_logit_scaled(Q2.5),
+         Q97.5 = inv_logit_scaled(Q97.5)) %>% 
+  select(Rearing_vial, Estimate, Q2.5, Q97.5) %>% 
+  mutate_at(2:4, round, 3)
+
+# combine with raw data 
+
+draws_rearing_vials <-
+  full_join(draws_rearing_vials, female_fitness %>% distinct(Rearing_vial, .keep_all = TRUE) %>% 
+  select(Block, Population, Treatment, GFP, Rearing_vial))
+
+# plot the variation between rearing vials for fitness, including block and GFP effects 
+
+draws_rearing_vials %>% mutate(Rearing_vial = as.numeric(Rearing_vial)) %>% 
+  ggplot(aes(x = Rearing_vial)) +
+  geom_hline(yintercept = inv_logit_scaled(median(draws$b_Intercept)), linetype = 2, size = 1/2) +
+  geom_vline(xintercept = c(24.5, 48.5), size = 1/3, color = "grey25") +
+  geom_point(aes(y = Estimate, fill = GFP), shape = 21, size = 3) +
+  annotate(geom = "text", 
+           x = c(12, 36, 60), y = 0.4, 
+           label = c("Block 1", "Block 2", "Block 3")) +
+  scale_fill_manual(values=c("grey", "green")) +
+  scale_x_continuous(breaks = NULL) +
+  scale_y_continuous(breaks = c(0.5, 0.75, 1), limits = c(0.35, 1)) +
+  labs(y = "Fitness",
+       x = NULL) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank())
+```
+
+**Figure 1**: there is an exploratory Figure that I'll cut from our final analysis...
+
+Note that populations carrying the 3xP GFP transgene appear to have higher fitness than those carrying the Ubi GFP transgene. Furthermore, Block 1 fitness measures appear to be higher than those in Blocks 2 or 3.
+
+$~$
+
+**The full model**
+
+Now lets add in the fixed effects:
+
+- Treatment
+
+- GFP
+
+- Block
+
+The model below is good, but it's missing the `Population` variable.
+
+```{r}
+female_fitness.02 <-
+  brm(Total_red_offspring | trials(Total_offspring) ~ 1 + Treatment + GFP + Block + (1|Rearing_vial),
+      data = female_fitness, family = binomial(), 
+      prior = c(prior(normal(0, 1.5), class = Intercept),
+                prior(normal(0, 2), class = b),
+                prior(exponential(1), class = sd)),
+      iter = 6000, warmup = 2000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.9, max_treedepth = 10),
+      seed = 2, file = "Fits/female_fitness.02")
+
+#add_criterion(female_fitness.02, criterion = "waic")
+
+print(female_fitness.02)
+```
+
+Provisionally, it appears that after accounting for the effect of GFP and the residual variance caused by block and vial effects, female fitness is higher when sex-limited inheritance occurs, regardless of the sex that is being limited...
+
+$~$
+
+Get predictions from the model and present them in a Table
+
+```{r}
+
+draws <- as_draws_df(female_fitness.02)
+
+draws_female <-
+  draws  %>% 
+  mutate(`Female-limited` = inv_logit_scaled(b_Intercept + b_TreatmentFemale_limited),
+         `Male-limited` = inv_logit_scaled(b_Intercept + b_TreatmentMale_limited),
+         Control = inv_logit_scaled(b_Intercept)) %>% 
+  select(Control, `Female-limited`, `Male-limited`) %>% 
+    pivot_longer(cols = c(Control, `Female-limited`, `Male-limited`),
+                 names_to = "Treatment") %>% 
+  rename(prop_focal_offspring = value)
+
+draws_female %>% 
+  group_by(Treatment) %>% 
+  summarise(`Estimated prop. of offspring produced` = median(prop_focal_offspring),
+            `2.5%` = quantile(prop_focal_offspring, probs = 0.025),
+            `97.5%` = quantile(prop_focal_offspring, probs = 0.975)) %>% 
+  rename(`Evolution treatment` = Treatment) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 3)
+
+# now find the differences between the control and the sex-limited treatments
+
+# the inv_logit_scaled() function converts the posterior draws onto the response scale 
+
+  draws %>% 
+  mutate(p_control =  inv_logit_scaled(b_Intercept),
+         p_female = inv_logit_scaled(b_TreatmentFemale_limited + b_Intercept),
+         p_male = inv_logit_scaled(b_TreatmentMale_limited + b_Intercept),
+         `Female-limited` = p_female / p_control,
+         `Male-limited` = p_male / p_control) %>% 
+  gather(key = `difference comparison`, value = `% difference`) %>% 
+  filter(`difference comparison` == c("Female-limited", "Male-limited")) %>% 
+  group_by(`difference comparison`)  %>% 
+  summarise(`Mean proportion of offspring produced relative to control`  = mean(`% difference`),
+            `2.5%` = quantile(`% difference`, probs = 0.025),
+            `97.5%` = quantile(`% difference`, probs = 0.975)) %>% 
+  rename(`Evolution treatment` = `difference comparison`) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 3)
+```
+
+Lets plot our findings
+
+```{r}
+# plot
+f_1 <-
+  draws_female %>% 
+  ggplot(aes(Treatment, prop_focal_offspring)) + 
+  stat_eye(aes(fill = Treatment), .width = c(0.66, 0.95), alpha = 1) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
+  scale_y_continuous("Female fitness\n(proportion of offspring produced)",
+                     breaks = c(0.6, 0.7, 0.8, 0.9)) +
+  xlab("Evolutionary history") +
+  theme_bw() + 
+  theme(legend.position = "none",
+        panel.grid.minor = element_blank())
+
+f_2 <-
+  draws %>% 
+  mutate(`Female-limited` = b_TreatmentFemale_limited,
+         `Male-limited` = b_TreatmentMale_limited) %>% 
+  gather(key = parameter, value = logodds) %>% 
+  filter(parameter == c("Female-limited", "Male-limited")) %>%
+  as_tibble() %>% 
+  
+  ggplot(aes(parameter, logodds)) + 
+  stat_halfeye(aes(fill = parameter), .width = c(0.66, 0.95)) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  scale_fill_manual(values = c("Female-limited" = "#ffd06f", "Male-limited" = "#72bcd5")) + 
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = 2) +
+  #scale_y_continuous(breaks = c(-4, -2, 0, 2)) +
+  xlab(NULL) +
+  ylab("Log-odds difference from control") +
+  theme_bw() + 
+  theme(legend.position = "none",
+        panel.grid.minor = element_blank())
+
+f_1 + f_2
+
+```
+
+
+**Figure 2**: chromosomes with sex-limited inheritance have higher fitness in females than chromosomes with unconstrained inheritance.
+
+$~$
+
+# Male fitness
+
+$~$
+
+To estimate the fitness of males carrying each of the three chromosome types, we conducted an experiment very similar to the female fitness assay. However, because male fitness has stronger covariance with fertilisation events than does female fitness, we conducted the male fitness assay with a 1:2 sex ratio (female:male) rather than the 1:1 ratio used in the female assay. This increases the strength of sexual selection and is a more appopriate way to expose differences in fitness between groups of males. As with the females, we calculated fitness as the proportion of red eyed offspring in the vial. 
+
+$~$
+
+Let's once again start with a simple model. We'll specify the binomial family, set priors and include `Rearing_vial` as a random effect, just as we did for the female data.
+
+```{r}
+male_fitness.01 <-
+  brm(Total_red_offspring | trials(Total_offspring) ~ 1 + (1|Rearing_vial),
+      data = male_fitness, family = binomial(), 
+      prior = c(prior(normal(0, 1.5), class = Intercept),
+                #prior(normal(0, 2), class = b),
+                prior(exponential(1), class = sd)),
+      iter = 10000, warmup = 2000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.95, max_treedepth = 10),
+      seed = 2, file = "Fits/male_fitness.01")
+
+#add_criterion(male_fitness.01, criterion = "waic")
+
+```
+
+Conduct the posterior predictive check...
+
+```{r}
+pp_check(male_fitness.01, type = "hist", ndraws = 11, binwidth = 10) +
+  theme_minimal() +
+  theme(panel.background = element_blank())
+```
+
+Now we can visualise our predictions for each rearing vial.
+
+```{r}
+# get draws from the posterior distribution
+
+draws_m <- as_draws_df(male_fitness.01)
+
+# wrangle the data to get relevant predictions
+
+draws_rearing_vials_m <- 
+  coef(male_fitness.01, robust = T)$Rearing_vial[, , ] %>% 
+  as_tibble(rownames = NA) %>% 
+  rownames_to_column("Rearing_vial") %>% 
+  mutate(Estimate = inv_logit_scaled(Estimate),
+         Q2.5 = inv_logit_scaled(Q2.5),
+         Q97.5 = inv_logit_scaled(Q97.5)) %>% 
+  select(Rearing_vial, Estimate, Q2.5, Q97.5) %>% 
+  mutate_at(2:4, round, 3)
+
+# combine with raw data 
+
+draws_rearing_vials_m <-
+  full_join(draws_rearing_vials_m, male_fitness %>% distinct(Rearing_vial, .keep_all = TRUE) %>% 
+  select(Block, Population, Treatment, GFP, Rearing_vial))
+
+# plot the variation between rearing vials for fitness, including block and GFP effects 
+
+draws_rearing_vials_m %>% 
+  mutate(Rearing_vial = as.numeric(Rearing_vial)) %>% 
+  ggplot(aes(x = Rearing_vial)) +
+  geom_hline(yintercept = inv_logit_scaled(median(draws$b_Intercept)), linetype = 2, size = 1/2) +
+  geom_vline(xintercept = c(24.5, 48.5), size = 1/3, color = "grey25") +
+  geom_point(aes(y = Estimate, fill = GFP), shape = 21, size = 3) +
+  annotate(geom = "text", 
+           x = c(12, 36, 60), y = 0.4, 
+           label = c("Block 1", "Block 2", "Block 3")) +
+  scale_fill_manual(values=c("grey", "green")) +
+  scale_x_continuous(breaks = NULL) +
+  scale_y_continuous(breaks = c(0.5, 0.75, 1), limits = c(0.35, 1)) +
+  labs(y = "Fitness",
+       x = NULL) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank())
+```
+
+
+Whether there is a difference in fitness between the two GFP transgenes is not as clear this time. However, we once again see differences in fitness between Blocks, with Block 2 looking to have higher fitness measures than 1 or 3.
+
+$~$
+
+**The full model**
+
+Now lets add in the fixed effects:
+
+- Treatment
+
+- GFP
+
+- Block
+
+The model below is good, but it's missing the `Population` variable.
+
+```{r}
+male_fitness.02 <-
+  brm(Total_red_offspring | trials(Total_offspring) ~ 1 + Treatment + GFP + Block + (1|Rearing_vial),
+      data = male_fitness, family = binomial(), 
+      prior = c(prior(normal(0, 1.5), class = Intercept),
+                prior(normal(0, 2), class = b),
+                prior(exponential(1), class = sd)),
+      iter = 10000, warmup = 2000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.95, max_treedepth = 10),
+      seed = 2, file = "Fits/male_fitness.02")
+
+#add_criterion(male_fitness.02, criterion = "waic")
+
+print(male_fitness.02)
+```
+
+This time, we have evidence to suggest that male-adapted chromosomes produce high fitness males, but that female-adaptted chromosomes produce males with the same fitness as do control chromosomes.
+
+$~$
+
+Get predictions from the model and present them in a Table
+
+```{r}
+
+draws_m <- as_draws_df(male_fitness.02)
+
+draws_male <-
+  draws_m  %>% 
+  mutate(`Female-limited` = inv_logit_scaled(b_Intercept + b_TreatmentFemale_limited),
+         `Male-limited` = inv_logit_scaled(b_Intercept + b_TreatmentMale_limited),
+         Control = inv_logit_scaled(b_Intercept)) %>% 
+  select(Control, `Female-limited`, `Male-limited`) %>% 
+    pivot_longer(cols = c(Control, `Female-limited`, `Male-limited`),
+                 names_to = "Treatment") %>% 
+  rename(prop_focal_offspring = value)
+
+draws_male %>% 
+  group_by(Treatment) %>% 
+  summarise(`Estimated prop. of offspring sired` = median(prop_focal_offspring),
+            `2.5%` = quantile(prop_focal_offspring, probs = 0.025),
+            `97.5%` = quantile(prop_focal_offspring, probs = 0.975)) %>% 
+  rename(`Evolution treatment` = Treatment) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 3)
+
+# now find the differences between the control and the sex-limited treatments
+
+# the inv_logit_scaled() function converts the posterior draws onto the response scale 
+
+  draws_m %>% 
+  mutate(p_control =  inv_logit_scaled(b_Intercept),
+         p_female = inv_logit_scaled(b_TreatmentFemale_limited + b_Intercept),
+         p_male = inv_logit_scaled(b_TreatmentMale_limited + b_Intercept),
+         `Female-limited` = p_female / p_control,
+         `Male-limited` = p_male / p_control) %>% 
+  gather(key = `difference comparison`, value = `% difference`) %>% 
+  filter(`difference comparison` == c("Female-limited", "Male-limited")) %>% 
+  group_by(`difference comparison`)  %>% 
+  summarise(`Mean proportion of offspring sired relative to control`  = mean(`% difference`),
+            `2.5%` = quantile(`% difference`, probs = 0.025),
+            `97.5%` = quantile(`% difference`, probs = 0.975)) %>% 
+  rename(`Evolution treatment` = `difference comparison`) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 3)
+```
+
+Lets plot our findings
+
+```{r}
+# plot
+f_3 <-
+  draws_male %>% 
+  ggplot(aes(Treatment, prop_focal_offspring)) + 
+  stat_eye(aes(fill = Treatment), .width = c(0.66, 0.95), alpha = 1) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
+  scale_y_continuous("Male fitness\n(proportion of offspring sired)",
+                     breaks = c(0.6, 0.7, 0.8, 0.9)) +
+  xlab("Evolutionary history") +
+  theme_bw() + 
+  theme(legend.position = "none",
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+f_4 <-
+  draws_m %>% 
+  mutate(`Female-limited` = b_TreatmentFemale_limited,
+         `Male-limited` = b_TreatmentMale_limited) %>% 
+  gather(key = parameter, value = logodds) %>% 
+  filter(parameter == c("Female-limited", "Male-limited")) %>%
+  as_tibble() %>% 
+  #mutate(parameter =factor(parameter, levels=c("SD-Mad", "SD-72", "SD-5"))) %>%
+  
+  ggplot(aes(parameter, logodds)) + 
+  stat_halfeye(aes(fill = parameter), .width = c(0.66, 0.95)) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  scale_fill_manual(values = c("Female-limited" = "#ffd06f", "Male-limited" = "#72bcd5")) + 
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = 2) +
+  #scale_y_continuous(breaks = c(-4, -2, 0, 2)) +
+  xlab(NULL) +
+  ylab("Log-odds difference from control") +
+  theme_bw() + 
+  theme(legend.position = "none",
+        panel.grid.minor = element_blank())
+
+f_3 + f_4
+
+```
+
+
+**Figure 3**: chromosomes with male-limited inheritance have higher fitness in males than chromosomes with unconstrained or female-limited inheritance.
