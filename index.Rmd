@@ -21,9 +21,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = FALSE)
 ```
 
-# Setup for analysis
-
-## Load packages
+# Load packages
 
 ```{r}
 library(Matrix) # my pc needs this to load the tidyverse correctly
@@ -41,7 +39,21 @@ library(pander) # for simpler tables
 
 ```
 
-## Load in the data 
+# Supplementary methods
+
+$~$
+
+**Table S1**. Recipe for food medium used in our experiment. The provided quantities make ~ 1 litre of food.
+
+```{r}
+tibble("Ingredients" = c("Soy flour", "Cornmeal", "Yeast", "Dextrose", "Agar", "Water", "Tegosept", "Acid mix (4 mL orthophosphoric acid, 41 mL propionic acid, 55 mL water to make 100 mL)"),
+       "Quantity" = c("20 g", "73 g", "35 g", "75 g", "6 g", "1000 mL", "17 mL", "14 mL")) %>% 
+  pander(split.cell = 40, split.table = Inf)
+```
+
+$~$
+
+# Load in the data 
 
 $~$
 
