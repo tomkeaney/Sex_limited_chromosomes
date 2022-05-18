@@ -143,6 +143,8 @@ male_fitness <-
 
 We fit the following fixed and random effects to model female and male fitness. Our aim is to estimate the causal effect that `Inheritance_treatment (I)` has on `fitness (F)`.
 
+The DAG below shows our understanding of the scientific question we are attempting to model. Arrows indicate the direction of causal effects, at least as we interpret them. 
+
 ```{r}
 # Lets make a function to speed up the DAG making process
 
@@ -223,6 +225,8 @@ $~$
 
 To estimate the fitness of females carrying each of the three autosome types, we placed three experimental females into a yeasted vial with three female competitors that carried the _bw_ mutation. We then introduced six males that also carried the _bw_ mutation. We allowed them to mate and oviposit for three days, then removed all adults from the vial. 12 days later we counted all of the adult progeny in the vial and scored them for eye-colour. Progeny with red eyes were produced by the experimental females ( _bw_ is recessive) and progeny with brown eyes were produced by the competitor females. We calculated fitness as the proportion of red eyed offspring in the vial. 
 
+We present the fixed effects from the model:
+
 $~$
 
 ```{r}
@@ -236,7 +240,9 @@ female_fitness_model <-
       control = list(adapt_delta = 0.95, max_treedepth = 10),
       seed = 2, stanvars = stanvars, file = "Fits/female_fitness.model")
 
-print(female_fitness_model)
+fixef(female_fitness_model) %>% 
+  kable(digits = 3) %>% 
+  kable_styling()
 
 ```
 
@@ -308,8 +314,8 @@ draws_female <-
   mutate(`Female-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentFemale_limited),
          `Male-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentMale_limited),
          Control = inv_logit_scaled(b_Intercept)) %>% 
-  select(Control, `Female-limited`, `Male-limited`) %>% 
-    pivot_longer(cols = c(Control, `Female-limited`, `Male-limited`),
+  select(`Female-limited`, Control, `Male-limited`) %>% 
+    pivot_longer(cols = c(`Female-limited`, Control, `Male-limited`),
                  names_to = "Inheritance_treatment") %>% 
   rename(prop_focal_offspring = value) %>% 
   arrange(Inheritance_treatment)
@@ -323,10 +329,14 @@ draws_diff <- draws  %>%
          `Female - Male` = `Female-limited` - `Male-limited`) %>% 
   select(`Female - Control`, `Male - Control`, `Female - Male`)
 
+ #draws_diff %>% 
+  # summarise(`Estimated prop. of offspring produced` = mean(`Male - Control`)*100,
+   #         `2.5%` = quantile(`Male - Control`, probs = 0.025) *100,
+    #        `97.5%` = quantile(`Male - Control`, probs = 0.975) *100)
 
 draws_female %>% 
   group_by(Inheritance_treatment) %>% 
-  summarise(`Estimated prop. of offspring produced` = median(prop_focal_offspring),
+  summarise(`Estimated prop. of offspring produced` = mean(prop_focal_offspring),
             `2.5%` = quantile(prop_focal_offspring, probs = 0.025),
             `97.5%` = quantile(prop_focal_offspring, probs = 0.975)) %>% 
   pander(split.cell = 40, split.table = Inf, round = 3)
@@ -373,7 +383,9 @@ male_fitness_model <-
       seed = 2, stanvars = stanvars, file = "Fits/male_fitness.model")
 
 
-print(male_fitness_model)
+fixef(male_fitness_model) %>% 
+  kable(digits = 3) %>% 
+  kable_styling()
 ```
 
 ```{r, include=FALSE}
@@ -454,7 +466,7 @@ draws_diff_m <- draws_m %>%
 
 draws_male %>% 
   group_by(Inheritance_treatment) %>% 
-  summarise(`Estimated prop. of offspring sired` = median(prop_focal_offspring),
+  summarise(`Estimated prop. of offspring sired` = mean(prop_focal_offspring),
             `2.5%` = quantile(prop_focal_offspring, probs = 0.025),
             `97.5%` = quantile(prop_focal_offspring, probs = 0.975)) %>% 
   pander(split.cell = 40, split.table = Inf, round = 3)
@@ -480,7 +492,7 @@ prop_table_male <-
   #pander(split.cell = 40, split.table = Inf, round = 3)
 ```
 
-# Building Figure 1
+# Building Figure 2
 
 ```{r, fig.height=8, fig.width=8}
 
@@ -488,34 +500,34 @@ prop_table_male <-
 
 f_1 <-
   draws_female %>% 
+  mutate(Inheritance_treatment = fct_relevel(Inheritance_treatment, "Female-limited", "Control", "Male-limited")) %>% 
   ggplot(aes(Inheritance_treatment, prop_focal_offspring)) + 
-  stat_eye(aes(fill = Inheritance_treatment), .width = c(0.66, 0.95), alpha = 1) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  stat_halfeye(aes(fill = Inheritance_treatment), .width = c(0.66, 0.95), alpha = 1,
+               point_interval = "mean_qi", point_fill = "white",
+               shape = 21, point_size = 3, stroke = 1.5) + # width indicates the uncertainty intervals: we have 66% and 95% intervals
   scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
-  scale_y_continuous("Fitness\n(prop. offspring produced)",
-                     breaks = c(0.7, 0.8)) +
-  #coord_cartesian(ylim = c(0.4, 1)) +
-  labs(title = "Female fitness") +
+  coord_flip() +
   xlab("Inheritance treatment") +
+  ylab("Female fitness\n(prop. offspring produced)") +
   theme_bw() + 
   theme(legend.position = "none",
-        panel.grid.minor = element_blank(),
-        axis.text.x = element_text(angle = 30, vjust = 0.5))
+        panel.grid.minor = element_blank())
 
 f_2 <-
   draws_diff %>% 
   gather(key = parameter, value = `Fitness difference`) %>% 
-  #filter(parameter == c("Female-limited", "Male-limited")) %>%
   as_tibble() %>%   
 
   ggplot(aes(parameter, `Fitness difference`)) + 
-  stat_halfeye(aes(fill = parameter), .width = c(0.66, 0.95), alpha = 0.9) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
-  scale_fill_manual(values = met.brewer("Hokusai3", 3)) +
+  stat_halfeye(.width = c(0.66, 0.95), alpha = 0.9, point_interval = "mean_qi",
+               slab_fill = met.brewer("Hiroshige")[1],
+               shape = 21, point_size = 3, stroke = 1.5,
+               point_fill = "white") + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
   coord_flip() +
   geom_hline(yintercept = 0, linetype = 2) +
   #scale_y_continuous(breaks = c(, 0, 1)) +
-  labs(title = "Female fitness") +
   xlab("Treatment contrast") +
-  ylab("Fitness difference\n(prop. offspring produced)") +
+  ylab("Female fitness difference\n(prop. offspring produced)") +
   theme_bw() + 
   theme(legend.position = "none",
         panel.grid.minor = element_blank())
@@ -524,34 +536,34 @@ f_2 <-
 
 f_3 <-
   draws_male %>% 
+  mutate(Inheritance_treatment = fct_relevel(Inheritance_treatment, "Female-limited", "Control", "Male-limited")) %>% 
   ggplot(aes(Inheritance_treatment, prop_focal_offspring)) + 
-  stat_eye(aes(fill = Inheritance_treatment), .width = c(0.66, 0.95), alpha = 1) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+   stat_halfeye(aes(fill = Inheritance_treatment), .width = c(0.66, 0.95), alpha = 1,
+               point_interval = "mean_qi", point_fill = "white",
+               shape = 21, point_size = 3, stroke = 1.5) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
   scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
-  scale_y_continuous("Fitness\n(prop. offspring sired)",
-                     breaks = c(0.4, 0.6, 0.8)) +
-  #coord_cartesian(ylim = c(0.4, 1)) +
-  labs(title = "Male fitness") +
+  coord_flip() +
   xlab("Inheritance treatment") +
+  ylab("Male fitness\n(prop. offspring produced)") +
   theme_bw() + 
   theme(legend.position = "none",
-        panel.grid.minor = element_blank(),
-        axis.text.x = element_text(angle = 30, vjust = 0.5))
+        panel.grid.minor = element_blank())
 
 f_4 <-
   draws_diff_m %>%
   gather(key = parameter, value = `Fitness difference`) %>% 
   as_tibble() %>% 
-
-  
   ggplot(aes(parameter, `Fitness difference`)) + 
-  stat_halfeye(aes(fill = parameter), .width = c(0.66, 0.95), alpha = 0.9) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  stat_halfeye(.width = c(0.66, 0.95), alpha = 0.9, point_interval = "mean_qi",
+               slab_fill = met.brewer("Hiroshige")[1],
+               shape = 21, point_size = 3, stroke = 1.5,
+               point_fill = "white") + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
   scale_fill_manual(values = met.brewer("Hokusai3", 3)) +
   coord_flip() +
   geom_hline(yintercept = 0, linetype = 2) +
   scale_y_continuous(breaks = c(-0.2, -0.1, 0, 0.1, 0.2)) +
-  labs(title = "Male fitness") +
   xlab("Treatment contrast") +
-  ylab("Fitness difference\n(prop. offspring sired)") +
+  ylab("Male fitness difference\n(prop. offspring sired)") +
   theme_bw() + 
   theme(legend.position = "none",
         panel.grid.minor = element_blank())
@@ -562,5 +574,5 @@ f_4 <-
 
 ```
 
-**Figure 1**: **a** shows the estimated distribution of the mean for female fitness for flies carrying autosomes that had previously experienced unconstrained inheritance (control), female-limited inheritance or male-limited inheritance. **b** shows the difference contrast in female fitness between each of the three inheritance treatments. This difference is on the proportion scale, where a value of 0.1 indicates that females of a given inheritance treatment produce 10 more offspring per every 100 when cohabiting with _bw_ competitor females. **c** and **d** depict the same things as **a** and **b**, except for male fitness.
+**Figure 2**: **a** shows the estimated distribution of the mean for female fitness for flies carrying autosomes that had previously experienced unconstrained inheritance (control), female-limited inheritance or male-limited inheritance. **b** shows the difference contrast in female fitness between each of the three inheritance treatments. This difference is on the proportion scale, where a value of 0.1 indicates that females of a given inheritance treatment produce 10 more offspring per every 100 when cohabiting with _bw_ competitor females. **c** and **d** depict the same things as **a** and **b**, except for male fitness.
 
