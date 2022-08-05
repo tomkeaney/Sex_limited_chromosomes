@@ -43,6 +43,10 @@ library(pander) # for simpler tables
 
 $~$
 
+**LH_m culturing**
+
+We maintained this LH_m stock in our laboratory for 32 generations prior to creating the genotypes required for experimental evolution. We cultured LH_m at 25C, with a 16-8 light-dark cycle and reared in vials (95mm x 25mm) on a corn-meal, yeast and dextrose-based diet (recipe in Table S1; ~8cm3 of food medium per vial) supplemented with dried yeast, at a population size of at least 800 breeding individuals across 25 vials (16 flies of each sex per vial, following Rice et al. 2005). Each generation begins by pooling the offspring produced across the 25 vials and randomly assorting 16 female-male pairs to 25 new vials. We then allow these breeding individuals 48 hours to interact and mate, before transferring them to another set of new vials. After 24 hours of egg-laying, we discard all adults, and allow juveniles 12 days to compete for resources, pupate and eclose as adults. We then iteratively repeat this process each generation to maintain the population.
+
 **Table S1**. Recipe for food medium used in our experiment. The provided quantities make ~ 1 litre of food.
 
 ```{r}

@@ -1,0 +1,348 @@
+---
+title: "Productivity_analysis"
+author: "Thomas Keaney, Theresa Jones and Luke Holman"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = FALSE)
+```
+
+# Setup for analysis
+
+## Load packages
+
+```{r}
+library(Matrix)
+library(tidyverse) # tidy style coding
+library(brms) # Bayesian models
+library(tidybayes) # Bayesian aesthetics
+library(MetBrewer) # colours
+library(pander) # tables
+library(DT) # more tables
+library(patchwork) # putting plots together
+
+```
+
+## Load in the data 
+
+```{r}
+
+Dev_time               <- read_csv("data/Dev_time_data_gen_1.csv") %>% 
+  mutate(Population = as.factor(Population),
+         Replicate = as.factor(Replicate))
+
+Dev_time               <-  
+  Dev_time %>%
+  group_by(Population, Replicate) %>% 
+  mutate(Family = as.factor(cur_group_id())) %>% 
+  ungroup() %>% 
+  mutate(Total_offspring = Female_offspring + Male_offspring)
+
+Productivity_B1           <- read_csv("data/Productivity_data_B1.csv") %>% 
+  select(-c(`...8`, `...9`)) %>% # there's something weird happening in excel, we remove the weirdness here
+  mutate(Cross           = as.factor(Population),
+         Replicate       = as.factor(Replicate),
+         Block           = as.factor(Block),
+         Total_offspring = Female_offspring + Male_offspring) %>% 
+  group_by(Population, Replicate) %>% 
+  mutate(Family          = as.factor(cur_group_id())) %>% 
+  ungroup() %>% 
+  arrange(Family) %>% 
+  select(Cross, Family, Treatment, Block, Generation, Female_offspring, Male_offspring, Total_offspring)
+
+Productivity_data <- read_csv("Data/Productivity_data_pooled_G11.csv") %>% 
+  mutate(Cross           = as.factor(Population),
+         Replicate       = as.factor(Replicate),
+         Block           = as.factor(Block),
+         Total_offspring = Female_offspring + Male_offspring) %>% 
+  group_by(Population, Replicate) %>% 
+  mutate(Family          = as.factor(cur_group_id())) %>% 
+  ungroup() %>% 
+  arrange(Family) %>% 
+  select(Cross, Family, Treatment, Block, Generation, Female_offspring, Male_offspring, Total_offspring)
+
+Productivity_data_G11 <-
+  Productivity_data %>% 
+  filter(Generation < 12)
+  
+
+```
+
+# Model Development time 
+
+```{r}
+dev_model              <-
+  brm(Total_offspring ~ Day * Treatment + (1|Family),
+      data = Dev_time, family = negbinomial(), 
+      prior = c(prior(normal(0, 10), class = Intercept),
+                                prior(normal(0, 2), class = b),
+                                prior(cauchy(0, 2), class = sd)),
+      iter = 6000, warmup = 2000, chains = 4, cores = 4,
+                      seed = 2, file = "Fits/dev_model")
+
+pp_check(dev_model)
+
+dev_factor_model       <- 
+  brm(Total_offspring ~ as.factor(Day) * Treatment + (1|Family),
+      data = Dev_time, family = negbinomial(), 
+      prior = c(prior(normal(0, 10), class = Intercept),
+                                prior(normal(0, 2), class = b),
+                                prior(cauchy(0, 2), class = sd)),
+      iter = 6000, warmup = 2000, chains = 4, cores = 4,
+                      seed = 2, file = "Fits/dev_factor_model")
+
+dev_factor_model
+
+pp_check(dev_factor_model)
+
+```
+
+## Get model predictions
+
+**Table 1**: the number of adult offspring that eclosed on each day of the collection period for generation 1.
+
+```{r}
+
+new_data               <- 
+  expand_grid(Day = Dev_time$Day, 
+              Treatment = Dev_time$Treatment) %>% 
+  distinct(Day, Treatment)
+
+model_predictions      <-
+  fitted(dev_factor_model, newdata = new_data, re_formula = NA)
+
+model_predictions      <- cbind(new_data, model_predictions)
+
+model_predictions %>% 
+  #mutate(`Variant carried` = recode(predictions$SD, "MAD" = "SD-Mad", "72" = "SD-72", "5" = "SD-5"),
+         #Sex = recode(predictions$Sex, "F" = "Female", "M" = "Male")) %>% 
+  #select(`Variant carried`, everything(), -SD) %>% 
+pander(split.cell = 40, split.table = Inf, round = 2)
+
+```
+
+
+```{r}
+# Now get the predicted posterior
+
+new_posterior          <- 
+  expand_grid(Day = Dev_time$Day, 
+              Treatment = Dev_time$Treatment) %>% 
+  distinct(Day, Treatment) %>% 
+  mutate(id = paste("V", 1:15, sep = "")) %>% 
+  as_tibble()
+
+posterior_prediction   <- 
+  as_tibble(fitted(dev_factor_model, newdata = new_posterior, re_formula = NA, summary = FALSE)) %>% # 15 cols, 16,000 rows
+  mutate(posterior_draw = 1:n()) %>%
+  tidyr::gather(key = id, value = total_offspring, -posterior_draw) %>%
+  left_join(new_posterior, by = "id") %>%
+  select(-id) %>% 
+  as_tibble()
+
+# prepare to plot
+
+dev_time_plot          <-
+  posterior_prediction %>%
+  mutate(Day = Day + 9) %>%
+  
+  ggplot(aes(x = Day, y = total_offspring, Group = Treatment)) + 
+  stat_halfeye(aes(fill = Treatment), .width = c(0.66, 0.95), position = position_dodge()) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  scale_fill_manual(values = wes_palette("Chevalier1"))+
+  scale_y_continuous("No. of adult offspring produced") +
+  # breaks = c(0.4, 0.5, 0.6, 0.7, 0.8, 0.9)) +
+  xlab("Days since breeding pair were introduced") +
+  coord_cartesian(ylim = c(0, 60)) +
+  theme_bw() + 
+  theme(panel.grid.minor = element_blank(),
+        legend.position="none")
+
+```
+
+# Sex ratio
+
+## Build the model
+
+```{r}
+sex_ratio_factor_model <- 
+  brm(Female_offspring | trials(Total_offspring) ~ as.factor(Day) * Treatment + (1|Family),
+      data = Dev_time %>% filter(Total_offspring != "0"), family = binomial(), 
+      prior = c(prior(normal(0, 10), class = Intercept),
+                                prior(normal(0, 2), class = b),
+                                prior(cauchy(0, 2), class = sd)),
+      iter = 6000, warmup = 2000, chains = 4, cores = 4,
+                      seed = 2, file = "Fits/sex_ratio_factor_model")
+
+sex_ratio_factor_model
+```
+
+## Get model predictions
+
+**Table 2**: the proportion of adult offspring that eclosed on each day of the collection period for generation 1.
+
+```{r}
+
+new_data               <- 
+  expand_grid(Total_offspring = 1,
+              Day = Dev_time$Day, 
+              Treatment = Dev_time$Treatment) %>% 
+  distinct(Total_offspring, Day, Treatment)
+
+model_predictions      <-
+  fitted(sex_ratio_factor_model, newdata = new_data, re_formula = NA)
+
+model_predictions      <- cbind(new_data, model_predictions)
+
+model_predictions %>% 
+  #mutate(`Variant carried` = recode(predictions$SD, "MAD" = "SD-Mad", "72" = "SD-72", "5" = "SD-5"),
+         #Sex = recode(predictions$Sex, "F" = "Female", "M" = "Male")) %>% 
+  #select(`Variant carried`, everything(), -SD) %>% 
+pander(split.cell = 40, split.table = Inf, round = 2)
+
+```
+
+
+```{r}
+# Now get the predicted posterior
+
+new_posterior          <- 
+  expand_grid(Total_offspring = 1,
+              Day = Dev_time$Day, 
+              Treatment = Dev_time$Treatment) %>% 
+  distinct(Total_offspring, Day, Treatment) %>% 
+  mutate(id = paste("V", 1:15, sep = "")) %>% 
+  as_tibble()
+
+posterior_prediction   <- 
+  as_tibble(fitted(sex_ratio_factor_model, newdata = new_posterior, re_formula = NA, summary = FALSE)) %>% # 15 cols, 16,000 rows
+  mutate(posterior_draw = 1:n()) %>%
+  tidyr::gather(key = id, value = proportion_female, -posterior_draw) %>%
+  left_join(new_posterior, by = "id") %>%
+  select(-c(id, Total_offspring)) %>% 
+  as_tibble()
+
+# plot
+
+sex_ratio_plot         <-
+  posterior_prediction %>%
+  mutate(Day = Day + 9) %>% 
+  
+  ggplot(aes(x = Day, y = proportion_female, Group = Treatment)) + 
+  stat_halfeye(aes(fill = Treatment), .width = c(0.66, 0.95), position = position_dodge()) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
+  geom_hline(yintercept = 0.5, linetype = 2) +
+  scale_fill_manual(values = wes_palette("Chevalier1")) +
+  scale_y_continuous("Prop. female offspring") +
+  # breaks = c(0.4, 0.5, 0.6, 0.7, 0.8, 0.9)) +
+  xlab("Days since breeding pair were introduced") +
+  coord_cartesian(ylim = c(0.3, 0.8)) +
+  theme_bw() + 
+  theme(panel.grid.minor = element_blank())
+```
+
+```{r}
+dev_time_plot + sex_ratio_plot
+```
+**Figure 1**: the proportion of female offspring that eclose each day  of adult offspring that eclosed on each day of the collection period for generation 1. **Figure 1**: the number of adult offspring that eclosed on each day of the collection period for generation 1. 
+
+$~$
+
+# Productivity analysis
+
+Ok, now to start on the important stuff. Here I have a peek at productivity over the first four to thirteen generations of the experiment. There are a few expectations that I have that we can look at. First **productivity should be negatively correlated with generation**, due to inbreeding depression. Second, the **populations that have responded to selection on males should exhibit a smaller drop in productivity compared with the female-adapted or control populations**, because they have a history of stronger selection that should, in theory, have purged the genome of recessive deleterious alleles.
+
+To test these two predictions, we can fit a glm 
+
+```{r}
+productivity_model_b1 <-
+  brm(Total_offspring ~ Generation * Treatment + (1|Cross) + (1|Family),
+      data = Productivity_B1, family = zero_inflated_negbinomial(), 
+      prior = c(prior(normal(0, 0.5), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(beta(2,2), class = zi),
+                prior(exponential(1), class = sd)),
+      iter = 10000, warmup = 4000, chains = 4, cores = 4,
+      seed = 2, file = "Fits/productivity_model",
+      control = list(adapt_delta = 0.999))
+
+pp_check(productivity_model_b1)
+
+productivity_model_b1
+
+## Now the full data
+
+productivity_model_full <-
+  brm(Total_offspring ~ Generation * Treatment + Block + (1|Cross) + (1|Family),
+      data = Productivity_data, family = zero_inflated_negbinomial(), 
+      prior = c(prior(normal(0, 0.5), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(beta(2,2), class = zi),
+                prior(exponential(1), class = sd)),
+      iter = 4000, warmup = 2000, chains = 4, cores = 4,
+      seed = 2, file = "Fits/productivity_model_full",
+      control = list(adapt_delta = 0.9))
+
+productivity_model_G11 <-
+  brm(Total_offspring ~ Generation * Treatment + Block + (1|Cross) + (1|Family),
+      data = Productivity_data_G11, family = zero_inflated_negbinomial(), 
+      prior = c(prior(normal(0, 0.5), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(beta(2,2), class = zi),
+                prior(exponential(1), class = sd)),
+      iter = 10000, warmup = 4000, chains = 4, cores = 4,
+      seed = 2, file = "Fits/productivity_model_G11",
+      control = list(adapt_delta = 0.999))
+
+```
+
+# Get model predictions
+
+```{r}
+new_data <- 
+  expand_grid(Treatment = Productivity_B1$Treatment,
+              Generation = c(1:20)) %>% 
+  distinct(Treatment, Generation)
+
+model_predictions      <-
+  fitted(productivity_model_b1, newdata = new_data, re_formula = NA)
+
+model_predictions      <- cbind(new_data, model_predictions) %>% 
+  as_tibble() %>% 
+  rename(`Inheritance treatment` = Treatment,
+         `Progeny produced` = Estimate)
+
+model_predictions %>% 
+  #mutate(`Variant carried` = recode(predictions$SD, "MAD" = "SD-Mad", "72" = "SD-72", "5" = "SD-5"),
+         #Sex = recode(predictions$Sex, "F" = "Female", "M" = "Male")) %>% 
+  #select(`Variant carried`, everything(), -SD) %>% 
+pander(split.cell = 40, split.table = Inf, round = 2)
+```
+
+A simple plot
+
+```{r}
+
+model_predictions %>% 
+  # plot!
+  ggplot(aes(x = Generation)) +
+  #geom_hline(yintercept = .5, linetype = 3) +
+  geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5, fill = `Inheritance treatment`),
+              alpha = 1/2) +
+  geom_line(aes(y = `Progeny produced`, color = `Inheritance treatment`), linetype =5, size = 0.8) +
+  scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
+  scale_color_manual(values = met.brewer("Hiroshige", 3)) +
+  ylab("Progney produced") +
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20)) +
+  xlab("Generations of inbreeding") +
+  theme_classic() + 
+  theme(panel.background = element_rect(fill='transparent'), #transparent panel bg
+        plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+        panel.grid.major = element_blank(), #remove major gridlines
+        panel.grid.minor = element_blank(), #remove minor gridlines
+        legend.background = element_rect(fill='transparent'), #transparent legend bg
+        legend.box.background = element_rect(fill='transparent', colour = 'transparent'), #transparent legend panel
+        text = element_text(size=18))
+```
+
