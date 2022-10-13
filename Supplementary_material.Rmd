@@ -1,0 +1,323 @@
+---
+title: "Experimental enforcement of sex-limited autosome inheritance does not reveal intralocus sexual conflict"
+author: "Thomas Keaney, Heidi Wong, Theresa Jones and Luke Holman"
+subtitle: Supplementary material
+output:
+  pdf_document:
+    toc: no
+    number_sections: no
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = FALSE, warning = FALSE, message = FALSE, fig.align = "center")
+```
+
+```{r, include=FALSE}
+library(Matrix) # my pc needs this to load the tidyverse correctly
+library(tidyverse) # tidy style coding
+library(png) # to load images
+library(grid) # to plot images
+library(brms) # Bayesian models
+library(tidybayes) # Bayesian aesthetics
+library(MetBrewer) # colours
+library(kableExtra) # tables
+library(patchwork) # putting plots together
+library(DT) # for search- and saveable tables
+library(pander) # for simpler tables
+```
+
+
+Click **[here](https://tomkeaney.github.io/Sex_limited_chromosomes/)** to view the HTML report, which serves as online supplementary material for the associated manuscript ( _insert DOI_), in review at _Insert Journal_. The report inlcudes the supplementary methods, documents our empirical analysis (contains raw data and R-script) and provides all supplementary figures and tables.
+
+In an attempt to future proof the availability of our supplementary material, we also include the supplementary methods, Table S1-XX and Figures S1 in this document. Additionally, our raw data is deposited in the Dryad database **[update when appicable](XXX)**.
+
+# Supplementary methods
+
+$~$
+
+**LH~M~ culturing**
+
+We maintained this LH~M~ stock in our laboratory for 32 generations prior to creating the genotypes required for experimental evolution. We cultured LH~M~ at 25C, with a 16-8 light-dark cycle and reared in vials (95mm x 25mm) on a corn-meal, yeast and dextrose-based diet (recipe in Table S1; ~8cm3 of food medium per vial) supplemented with dried yeast, at a population size of at least 800 breeding individuals across 25 vials (16 flies of each sex per vial, following Rice _et al_. 2005). Each generation begins by pooling the offspring produced across the 25 vials and randomly assorting 16 female-male pairs to 25 new vials. We then allow these breeding individuals 48 hours to interact and mate, before transferring them to another set of new vials. After 24 hours of egg-laying, we discard all adults, and allow juveniles 12 days to compete for resources, pupate and eclose as adults. We then iteratively repeat this process each generation to maintain the population.
+
+$~$
+
+**Creating the genotypes used for experimental evolution**
+
+We performed the following crosses on mass to preserve genetic variation in our evolving population. **XX individuals were used...**
+
+```{r}
+img <- readPNG("Crossing_scheme.png")
+ 
+grid.raster(img)
+```
+
+**Figure S1**. Crossing scheme used to integrate the GFP constructs and _ap^XA^_ marked translocated second and third chromosome balancers into the LH~M~ genetic background. We replicated the crosses 12 times (for XX individuals) to supply the flies used in generation zero of experimental evolution; 6 times using the _Ubi_ GFP construct and 6 times with the _3xP_ construct. G = generation.
+
+$~$
+
+**Table S1**. Recipe for food medium used in our experiment. The provided quantities make ~ 1 litre of food.
+
+```{r}
+tibble("Ingredients" = c("Soy flour", "Cornmeal", "Yeast", "Dextrose", "Agar", "Water", "Tegosept", "Acid mix (4 mL orthophosphoric acid, 41 mL propionic acid, 55 mL water to make 100 mL)"),
+       "Quantity" = c("20 g", "73 g", "35 g", "75 g", "6 g", "1000 mL", "17 mL", "14 mL")) %>% 
+  pander(split.cell = 40, split.table = Inf)
+```
+
+```{r, include=FALSE}
+female_fitness_model <-
+  brm(Total_red_offspring | vint(Total_offspring) ~ 1 + Inheritance_treatment + Block + GFP + (1|Population) + (1|Rearing_vial),
+      data = female_fitness, family = beta_binomial2, 
+      prior = c(prior(normal(0, 1), class = Intercept),
+                prior(normal(0, 1.5), class = b),
+                prior(exponential(1), class = phi)),
+      iter = 4000, warmup = 2000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.95, max_treedepth = 10),
+      seed = 2, stanvars = stanvars, file = "Fits/female_fitness.model")
+
+fixef(female_fitness_model) %>% 
+  kable(digits = 3) %>% 
+  kable_styling()
+
+```
+
+$~$
+
+**Table S2**. Estimated female fitness for flies carrying autosomes derived from each of the three inheritance regimes.
+
+```{r}
+
+draws <- as_draws_df(female_fitness_model)
+
+draws_female <-
+  draws  %>% 
+  mutate(`Female-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentFemale_limited),
+         `Male-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentMale_limited),
+         Control = inv_logit_scaled(b_Intercept)) %>% 
+  select(`Female-limited`, Control, `Male-limited`) %>% 
+    pivot_longer(cols = c(`Female-limited`, Control, `Male-limited`),
+                 names_to = "Inheritance treatment") %>% 
+  rename(prop_focal_offspring = value) %>% 
+  arrange(`Inheritance treatment`)
+
+draws_female %>% 
+  group_by(`Inheritance treatment`) %>% 
+  summarise(`Estimated prop. of offspring produced` = mean(prop_focal_offspring),
+            `2.5%` = quantile(prop_focal_offspring, probs = 0.025),
+            `97.5%` = quantile(prop_focal_offspring, probs = 0.975)) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 3)
+
+```
+
+$~$
+
+**Table S3**. Differences in female fitness between each of the three inheritance regimes.
+
+```{r}
+# Find differences and visualise in table
+
+draws_diff <- draws  %>% 
+  mutate(`Female-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentFemale_limited),
+         `Male-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentMale_limited),
+         Control = inv_logit_scaled(b_Intercept)) %>%
+  mutate(`Female - Control` = `Female-limited` - Control,
+         `Male - Control` = `Male-limited` - Control,
+         `Female - Male` = `Female-limited` - `Male-limited`) %>% 
+  select(`Female - Control`, `Male - Control`, `Female - Male`)
+
+rbind(
+  draws_diff %>% 
+    summarise(`Diff in offspring produced per 100` = mean(`Male - Control`)*100,
+              `2.5%` = quantile(`Male - Control`, probs = 0.025) *100,
+              `97.5%` = quantile(`Male - Control`, probs = 0.975) *100) %>% 
+    mutate(Contrast = "Male inherited - Control"),
+  
+  draws_diff %>% 
+    summarise(`Diff in offspring produced per 100` = mean(`Female - Control`)*100,
+              `2.5%` = quantile(`Female - Control`, probs = 0.025) *100,
+              `97.5%` = quantile(`Female - Control`, probs = 0.975) *100) %>% 
+    mutate(Contrast = "Female inherited - Control"),
+  
+  draws_diff %>% 
+    summarise(`Diff in offspring produced per 100` = mean(`Female - Male`)*100,
+              `2.5%` = quantile(`Female - Male`, probs = 0.025) *100,
+              `97.5%` = quantile(`Female - Male`, probs = 0.975) *100) %>% 
+    mutate(Contrast = "Female inherited - Male inherited")
+) %>% 
+  select(Contrast, `Diff in offspring produced per 100`, `2.5%`, `97.5%`) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 2)
+
+```
+
+$~$
+
+**Table S4**. The effects of the fixed predictor variables on female fitness that are not directly related to intralocus sexual conflict. Female fitness measured in Block 1 was higher than that measured in Blocks 2 and 3. Females carrying autosomes marked with 3xP GFP had higher fitness than those expressing UBI GFP.
+
+```{r}
+  
+draws_diff_other <- draws  %>% 
+  select(b_Intercept, b_Block2, b_Block3, b_GFPUBI) %>% 
+  mutate(`Block 1, 3xP` = inv_logit_scaled(b_Intercept),
+         `Block 2` = inv_logit_scaled(b_Intercept + b_Block2),
+         `Block 3` = inv_logit_scaled(b_Intercept + b_Block3),
+         UBI = inv_logit_scaled(b_Intercept + b_GFPUBI)) %>%
+  mutate(`Block 1 - Block 2` = `Block 1, 3xP` - `Block 2`,
+         `Block 1 - Block 3` = `Block 1, 3xP` - `Block 3`,
+         `3xP - UBI` = `Block 1, 3xP` - UBI) %>% 
+  select(`Block 1 - Block 2`, `Block 1 - Block 3`, `3xP - UBI`)
+
+# Find differences and visualise in table
+
+rbind(
+draws_diff_other %>% 
+  summarise(`Diff in offspring produced per 100` = mean(`Block 1 - Block 2`)*100,
+            `2.5%` = quantile(`Block 1 - Block 2`, probs = 0.025) *100,
+            `97.5%` = quantile(`Block 1 - Block 2`, probs = 0.975) *100) %>% 
+  mutate(Contrast = "Block 1 - Block 2"),
+
+
+draws_diff_other %>% 
+  summarise(`Diff in offspring produced per 100` = mean(`Block 1 - Block 3`)*100,
+            `2.5%` = quantile(`Block 1 - Block 3`, probs = 0.025) *100,
+            `97.5%` = quantile(`Block 1 - Block 3`, probs = 0.975) *100) %>% 
+  mutate(Contrast = "Block 1 - Block 3"),
+
+
+draws_diff_other %>% 
+  summarise(`Diff in offspring produced per 100` = mean(`3xP - UBI`)*100,
+            `2.5%` = quantile(`3xP - UBI`, probs = 0.025) *100,
+            `97.5%` = quantile(`3xP - UBI`, probs = 0.975) *100) %>% 
+  mutate(Contrast = "3xP - UBI")
+) %>% 
+  select(Contrast, `Diff in offspring produced per 100`, `2.5%`, `97.5%`) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 2)
+```
+
+```{r, include=FALSE}
+male_fitness_model <-
+  brm(Total_red_offspring | vint(Total_offspring) ~ 1 + Inheritance_treatment + Block + GFP + (1|Population) + (1|Rearing_vial),
+      data = male_fitness, family = beta_binomial2, 
+      prior = c(prior(normal(0, 1), class = Intercept),
+                prior(normal(0, 1.5), class = b),
+                prior(exponential(1), class = phi)),
+      iter = 4000, warmup = 2000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.95, max_treedepth = 10),
+      seed = 2, stanvars = stanvars, file = "Fits/male_fitness.model")
+```
+
+$~$
+
+**Table S5**. Estimated male fitness for flies carrying autosomes derived from each of the three inheritance regimes.
+
+```{r}
+
+draws_m <- as_draws_df(male_fitness_model)
+
+# predictions averaged over mediator variables
+
+draws_male <-
+  draws_m  %>% 
+  mutate(`Female-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentFemale_limited),
+         `Male-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentMale_limited),
+         Control = inv_logit_scaled(b_Intercept)) %>% 
+  select(Control, `Female-limited`, `Male-limited`) %>% 
+    pivot_longer(cols = c(Control, `Female-limited`, `Male-limited`),
+                 names_to = "Inheritance treatment") %>% 
+  rename(prop_focal_offspring = value)
+
+
+draws_male %>% 
+  group_by(`Inheritance treatment`) %>% 
+  summarise(`Estimated prop. of offspring sired` = mean(prop_focal_offspring),
+            `2.5%` = quantile(prop_focal_offspring, probs = 0.025),
+            `97.5%` = quantile(prop_focal_offspring, probs = 0.975)) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 3)
+
+```
+
+$~$
+
+**Table S6**. Differences in male fitness between each of the three inheritance regimes.
+
+```{r}
+draws_diff_m <- draws_m %>% 
+  mutate(`Female-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentFemale_limited),
+         `Male-limited` = inv_logit_scaled(b_Intercept + b_Inheritance_treatmentMale_limited),
+         Control = inv_logit_scaled(b_Intercept)) %>%
+  mutate(`Female - Control` = `Female-limited` - Control,
+         `Male - Control` = `Male-limited` - Control,
+         `Female - Male` = `Female-limited` - `Male-limited`) %>% 
+  select(`Female - Control`, `Male - Control`, `Female - Male`)
+
+# Find differences and visualise in table
+
+rbind(
+  draws_diff_m %>% 
+    summarise(`Diff in offspring produced per 100` = mean(`Female - Control`)*100,
+              `2.5%` = quantile(`Female - Control`, probs = 0.025) *100,
+              `97.5%` = quantile(`Female - Control`, probs = 0.975) *100) %>% 
+    mutate(Contrast = "Female inherited - Control"),
+  
+  draws_diff_m %>% 
+    summarise(`Diff in offspring produced per 100` = mean(`Male - Control`)*100,
+              `2.5%` = quantile(`Male - Control`, probs = 0.025) *100,
+              `97.5%` = quantile(`Male - Control`, probs = 0.975) *100) %>% 
+    mutate(Contrast = "Male inherited - Control"),
+  
+  
+  draws_diff_m %>% 
+    summarise(`Diff in offspring produced per 100` = mean(`Female - Male`)*100,
+              `2.5%` = quantile(`Female - Male`, probs = 0.025) *100,
+              `97.5%` = quantile(`Female - Male`, probs = 0.975) *100) %>% 
+    mutate(Contrast = "Female inherited - Male inherited")
+) %>% 
+  select(Contrast, `Diff in offspring produced per 100`, `2.5%`, `97.5%`) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 2)
+
+```
+
+$~$
+
+**Table S7**. The effects of the fixed predictor variables on male fitness that are not directly related to intralocus sexual conflict. Male fitness measured in Block 2 was higher than that measured in Blocks 1 and 3. There was no effect of GFP transgene on male fitness.
+
+```{r}
+  
+draws_diff_other_m <- draws_m  %>% 
+  select(b_Intercept, b_Block2, b_Block3, b_GFPUBI) %>% 
+  mutate(`Block 1, 3xP` = inv_logit_scaled(b_Intercept),
+         `Block 2` = inv_logit_scaled(b_Intercept + b_Block2),
+         `Block 3` = inv_logit_scaled(b_Intercept + b_Block3),
+         UBI = inv_logit_scaled(b_Intercept + b_GFPUBI)) %>%
+  mutate(`Block 1 - Block 2` = `Block 1, 3xP` - `Block 2`,
+         `Block 1 - Block 3` = `Block 1, 3xP` - `Block 3`,
+         `3xP - UBI` = `Block 1, 3xP` - UBI) %>% 
+  select(`Block 1 - Block 2`, `Block 1 - Block 3`, `3xP - UBI`)
+
+# Find differences and visualise in table
+
+rbind(
+draws_diff_other_m %>% 
+  summarise(`Diff in offspring produced per 100` = mean(`Block 1 - Block 2`)*100,
+            `2.5%` = quantile(`Block 1 - Block 2`, probs = 0.025) *100,
+            `97.5%` = quantile(`Block 1 - Block 2`, probs = 0.975) *100) %>% 
+  mutate(Contrast = "Block 1 - Block 2"),
+
+
+draws_diff_other_m %>% 
+  summarise(`Diff in offspring produced per 100` = mean(`Block 1 - Block 3`)*100,
+            `2.5%` = quantile(`Block 1 - Block 3`, probs = 0.025) *100,
+            `97.5%` = quantile(`Block 1 - Block 3`, probs = 0.975) *100) %>% 
+  mutate(Contrast = "Block 1 - Block 3"),
+
+
+draws_diff_other_m %>% 
+  summarise(`Diff in offspring produced per 100` = mean(`3xP - UBI`)*100,
+            `2.5%` = quantile(`3xP - UBI`, probs = 0.025) *100,
+            `97.5%` = quantile(`3xP - UBI`, probs = 0.975) *100) %>% 
+  mutate(Contrast = "3xP - UBI")
+) %>% 
+  select(Contrast, `Diff in offspring produced per 100`, `2.5%`, `97.5%`) %>% 
+  pander(split.cell = 40, split.table = Inf, round = 2)
+
+```
