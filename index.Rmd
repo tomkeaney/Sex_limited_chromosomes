@@ -627,10 +627,10 @@ f_1 <-
   draws_female %>% 
   mutate(`Inheritance treatment` = fct_relevel(`Inheritance treatment`, "Female-limited", "Control", "Male-limited")) %>% 
   ggplot(aes(`Inheritance treatment`, prop_focal_offspring)) + 
-  stat_halfeye(aes(fill = `Inheritance treatment`), .width = c(0.66, 0.95), alpha = 1,
+  stat_halfeye(fill = "grey", .width = c(0.66, 0.95), alpha = 1,
                point_interval = "mean_qi", point_fill = "white",
                shape = 21, point_size = 3, stroke = 1.5) + # width indicates the uncertainty intervals: we have 66% and 95% intervals
-  scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
+  #scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
   coord_flip() +
   ylab("Female fitness\n(prop. offspring produced)") +
   theme_bw() + 
@@ -644,7 +644,7 @@ f_2 <-
 
   ggplot(aes(parameter, `Fitness difference`)) + 
   stat_halfeye(.width = c(0.66, 0.95), alpha = 0.9, point_interval = "mean_qi",
-               slab_fill = met.brewer("Hiroshige")[1],
+               slab_fill = "grey",
                shape = 21, point_size = 3, stroke = 1.5,
                point_fill = "white") + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
   coord_flip() +
@@ -662,7 +662,7 @@ f_3 <-
   draws_male %>% 
   mutate(`Inheritance treatment` = fct_relevel(`Inheritance treatment`, "Female-limited", "Control", "Male-limited")) %>% 
   ggplot(aes(`Inheritance treatment`, prop_focal_offspring)) + 
-   stat_halfeye(aes(fill = `Inheritance treatment`), .width = c(0.66, 0.95), alpha = 1,
+   stat_halfeye(fill = "grey", .width = c(0.66, 0.95), alpha = 1,
                point_interval = "mean_qi", point_fill = "white",
                shape = 21, point_size = 3, stroke = 1.5) + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
   scale_fill_manual(values = met.brewer("Hiroshige", 3)) +
@@ -678,7 +678,7 @@ f_4 <-
   as_tibble() %>% 
   ggplot(aes(parameter, `Fitness difference`)) + 
   stat_halfeye(.width = c(0.66, 0.95), alpha = 0.9, point_interval = "mean_qi",
-               slab_fill = met.brewer("Hiroshige")[1],
+               slab_fill = "grey",
                shape = 21, point_size = 3, stroke = 1.5,
                point_fill = "white") + # width indicates the uncertainty intervals: here we have 66% and 95% intervals
   scale_fill_manual(values = met.brewer("Hokusai3", 3)) +
