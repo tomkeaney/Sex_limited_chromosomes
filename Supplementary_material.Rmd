@@ -31,7 +31,7 @@ library(pander) # for simpler tables
 
 Click **[here](https://tomkeaney.github.io/Sex_limited_chromosomes/)** to view the HTML report, which serves as online supplementary material for the associated manuscript ( _insert DOI_), in review at _Insert Journal_. The report inlcudes the supplementary methods, documents our empirical analysis (contains raw data and R-script) and provides all supplementary figures and tables.
 
-In an attempt to future proof the availability of our supplementary material, we also include the supplementary methods, Table S1-XX and Figures S1 in this document. Additionally, our raw data is deposited in the Dryad database **[update when appicable](XXX)**.
+In an attempt to future proof the availability of our supplementary material, we also include the supplementary methods, Table S1-S7 and Figure S1 in this document. Additionally, our raw data is deposited in the Dryad database **[update when appicable](XXX)**.
 
 # Supplementary methods
 
@@ -39,21 +39,19 @@ $~$
 
 **LH~M~ culturing**
 
-We maintained this LH~M~ stock in our laboratory for 32 generations prior to creating the genotypes required for experimental evolution. We cultured LH~M~ at 25C, with a 16-8 light-dark cycle and reared in vials (95mm x 25mm) on a corn-meal, yeast and dextrose-based diet (recipe in Table S1; ~8cm3 of food medium per vial) supplemented with dried yeast, at a population size of at least 800 breeding individuals across 25 vials (16 flies of each sex per vial, following Rice _et al_. 2005). Each generation begins by pooling the offspring produced across the 25 vials and randomly assorting 16 female-male pairs to 25 new vials. We then allow these breeding individuals 48 hours to interact and mate, before transferring them to another set of new vials. After 24 hours of egg-laying, we discard all adults, and allow juveniles 12 days to compete for resources, pupate and eclose as adults. We then iteratively repeat this process each generation to maintain the population.
+We maintained this LH~M~ stock in our laboratory for 32 generations prior to creating the genotypes required for experimental evolution. We cultured LH~M~ at 25C, with a 16-8 light-dark cycle and reared in vials (95mm x 25mm) on a corn-meal, yeast and dextrose-based diet (recipe in Table S1; ~8cm3 of food medium per vial) supplemented with dried yeast, at a population size of at least 800 breeding individuals across 25 vials (16 flies of each sex per vial, [following Rice _et al_. 2005](https://doi.org/10.1073/pnas.0501889102)). Each generation begins by pooling the offspring produced across the 25 vials and randomly assorting 16 female-male pairs to 25 new vials. We then allow these breeding individuals 48 hours to interact and mate, before transferring them to another set of new vials. After 24 hours of egg-laying, we discard all adults, and allow juveniles 12 days to compete for resources, pupate and eclose as adults. We then iteratively repeat this process each generation to maintain the population.
 
 $~$
 
 **Creating the genotypes used for experimental evolution**
 
-We performed the following crosses on mass to preserve genetic variation in our evolving population. **XX individuals were used...**
-
 ```{r}
-img <- readPNG("Crossing_scheme.png")
+img <- readPNG("Figure_S1.png")
  
 grid.raster(img)
 ```
 
-**Figure S1**. Crossing scheme used to integrate the GFP constructs and _ap^XA^_ marked translocated second and third chromosome balancers into the LH~M~ genetic background. We replicated the crosses 12 times (for XX individuals) to supply the flies used in generation zero of experimental evolution; 6 times using the _Ubi_ GFP construct and 6 times with the _3xP_ construct. G = generation.
+**Figure S1**. Crossing scheme used to integrate the GFP constructs and _ap^XA^_ marked translocated second and third chromosome balancers into the LH~M~ genetic background. We replicated the crosses 12 times (for XX individuals) to supply the flies used in generation zero of experimental evolution; 6 times using the _Ubi_ GFP construct and 6 times with the _3xP_ GFP construct. We performed each cross across 25 vials, with 16 females and 16 males in each, to preserve genetic variation in our evolving populations. G = generation.
 
 $~$
 
@@ -72,7 +70,7 @@ female_fitness_model <-
       prior = c(prior(normal(0, 1), class = Intercept),
                 prior(normal(0, 1.5), class = b),
                 prior(exponential(1), class = phi)),
-      iter = 4000, warmup = 2000, chains = 4, cores = 4,
+      iter = 8000, warmup = 4000, chains = 4, cores = 4,
       control = list(adapt_delta = 0.95, max_treedepth = 10),
       seed = 2, stanvars = stanvars, file = "Fits/female_fitness.model")
 
@@ -201,7 +199,7 @@ male_fitness_model <-
       prior = c(prior(normal(0, 1), class = Intercept),
                 prior(normal(0, 1.5), class = b),
                 prior(exponential(1), class = phi)),
-      iter = 4000, warmup = 2000, chains = 4, cores = 4,
+      iter = 8000, warmup = 4000, chains = 4, cores = 4,
       control = list(adapt_delta = 0.95, max_treedepth = 10),
       seed = 2, stanvars = stanvars, file = "Fits/male_fitness.model")
 ```

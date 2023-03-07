@@ -53,15 +53,13 @@ $~$
 
 **Creating the genotypes used for experimental evolution**
 
-We performed the following crosses on mass to preserve genetic variation in our evolving population. **XX individuals were used...**
-
 ```{r}
-img <- readPNG("Crossing_scheme.png")
+img <- readPNG("Figure_S1.png")
  
 grid.raster(img)
 ```
 
-**Figure S1**. Crossing scheme used to integrate the GFP constructs and _ap^XA^_ marked translocated second and third chromosome balancers into the LH~M~ genetic background. We replicated the crosses 12 times (for XX individuals) to supply the flies used in generation zero of experimental evolution; 6 times using the _Ubi_ GFP construct and 6 times with the _3xP_ construct. G = generation.
+**Figure S1**. Crossing scheme used to integrate the GFP constructs and _ap^XA^_ marked translocated second and third chromosome balancers into the LH~M~ genetic background. We replicated the crosses 12 times to supply the flies used in generation zero of experimental evolution; 6 times using the _Ubi_ GFP construct and 6 times with the _3xP_ construct. G = generation.
 
 $~$
 
@@ -179,34 +177,6 @@ male_fitness <-
 
 We fit the following fixed and random effects to model female and male fitness. Our aim is to estimate the causal effect that `Inheritance_treatment (I)` has on `fitness (F)`.
 
-The DAG below shows our understanding of the scientific question we are attempting to model. Arrows indicate the direction of causal effects, at least as we interpret them. 
-
-```{r}
-# Lets make a function to speed up the DAG making process
-
-gg_simple_dag <- function(d) {
-  
-  d %>% 
-    ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
-    geom_dag_point(color = met.brewer("Hiroshige")[4]) +
-    geom_dag_text(color = met.brewer("Hiroshige")[7]) +
-    geom_dag_edges() + 
-    theme_dag()
-  
-}
-
-dag_coords <-
-  tibble(name = c("I", "G", "B", "P", "R", "F"),
-         x    = c(1, 1.5, 2.5, 1.5, 2.5, 2),
-         y    = c(2, 3, 3, 1, 1, 2))
-
-dagify(F ~ I + G + B + P + R,
-       coords = dag_coords) %>%
-  gg_simple_dag()
-
-
-```
-
 **Fixed effects**
 
 `Inheritance_treatment (I)`: this is the inheritance regime that the autosomes carried by each of the populations were subject to for 20 generations. There are three levels: populations carrying female-adapted autosomes, populations containing male-adapted autosomes and populations carrying control autosomes that experienced an unmanipulated inheritance regime. We are designing our model to test for a causal effect of this variable.
@@ -269,11 +239,11 @@ $~$
 female_fitness_model <-
   brm(Total_red_offspring | vint(Total_offspring) ~ 1 + Inheritance_treatment + Block + GFP + (1|Population) + (1|Rearing_vial),
       data = female_fitness, family = beta_binomial2, 
-      prior = c(prior(normal(0, 1), class = Intercept),
+      prior = c(prior(normal(0, 1), class = Intercept), # this sets the prior mean at 0.5 relative fitness
                 prior(normal(0, 1.5), class = b),
                 prior(exponential(1), class = phi)),
-      iter = 4000, warmup = 2000, chains = 4, cores = 4,
-      control = list(adapt_delta = 0.95, max_treedepth = 10),
+      iter = 8000, warmup = 4000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.98, max_treedepth = 10),
       seed = 2, stanvars = stanvars, file = "Fits/female_fitness.model")
 
 fixef(female_fitness_model) %>% 
@@ -465,7 +435,7 @@ male_fitness_model <-
       prior = c(prior(normal(0, 1), class = Intercept),
                 prior(normal(0, 1.5), class = b),
                 prior(exponential(1), class = phi)),
-      iter = 4000, warmup = 2000, chains = 4, cores = 4,
+      iter = 8000, warmup = 4000, chains = 4, cores = 4,
       control = list(adapt_delta = 0.95, max_treedepth = 10),
       seed = 2, stanvars = stanvars, file = "Fits/male_fitness.model")
 
