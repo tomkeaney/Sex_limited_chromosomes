@@ -51,6 +51,31 @@ We maintained this LH~M~ stock in our laboratory for 32 generations prior to cre
 
 $~$
 
+**The recombination compartment**
+
+$~$
+
+_The female recombination compartment_ 
+
+When we initiated the first generation of experimental evolution for each of the sex-limited populations, we placed 12 females with the _FLA/FLA_ genotype into individual food vials, each containing a _FLA/ap^XA^_ male. We allowed them ~24 hours to mate, then discarded the males and pooled the 12 females into a single vial. After ~72 hours we discarded the females and allowed their offspring to develop. The aim of this breeding design was to minimise selection acting on the _FLA/ap^XA^_ males, since each male simply needed to survive and then fertilise one randomly assigned virgin female. 
+From the progeny, we collected 24 virgin female offspring with the genotype _FLA/FLA_, where recombination had occurred between the homologous _FLA_ chromosomes. Half of these females were used to establish the next iteration of the recombination compartment, where they were again individually mated to 12 _FLA/ap^XA^_ males sourced from the progeny of the main population. The 12 remaining _FLA/FLA_ females, which carried one set of recombined _FLA_ autosomes inherited from their mother, were randomly substituted for 12 females in the main breeding population. Therefore, 6% of the females in each generation came from the recombination compartment (Figure 1). 
+
+_The male recombination compartment_
+
+At the start of the first generation for each sex-limited population, we placed 12 females with genotype _MLA/ap^XA^_ into a single food vial along with 12 _MLA/ap^XA^_ males. We allowed ~24 hours for the males to compete for fertilisations, after which we discarded the males and moved the females into individual food vials to oviposit. We collected one female and one male _MLA/MLA_ offspring from each of the oviposition vials. This rearing protocol minimised selection on females, since females were reared mostly in a competition- and harassment-free environment, and we equalised fitness by collecting a standard number of progeny from each female. The 12 males were randomly substituted for 12 males in the main breeding population breeding population (carrying recombined _MLA_ autosomes inherited from their mother), and the 12 females were used in the next iteration of the male recombination compartment. Therefore, 6% of the males in each generation came from the recombination compartment (Figure 1).
+
+We also included a female and male recombination compartment for each of the four control populations. The process was identical as for the sex-limited populations, except that control autosomes can be substituted in the above descriptions for female- or male-limited autosomes.  
+
+$~$
+
+**Creating populations homozygous for sex-limited autosomes**
+
+$~$ 
+
+After 20 generations of experimental evolution, the Covid-19 pandemic necessitated that we cease regular laboratory work. In order to preserve the genetic composition of the evolved populations in a form that did not require intensive maintenance, we conducted crosses which converted our 8 replicate populations into 12 populations carrying only one chromosome type ( _FLA_, _MLA_, or _CA_). To create the 4 _FLA_ populations, we crossed 200 male and 200 female _FLA/ap^XA^_ individuals from each of the 4 sex-limited populations, producing _FLA/ap^XA^_ and _FLA/FLA_ offspring. These offspring were tipped into new food vials and allowed to breed freely, and a sample of the resulting population was transferred to new food vials every two weeks (at a population size of 13 vials each containing 8 females and 8 males, keeping the population size of chromosomes the same – offspring were pooled across the vials when setting up the next generation). We similarly created and propagated four populations carrying _MLA_ and four carrying _CA_ alleles. The _ap^XA^_ balancer chromosomes are deleterious or lethal, and so the balancer was rapidly lost from all 12 populations. We maintained each line under these conditions for 16 generations (i.e. until the easing of Covid-19 lockdown restrictions in Melbourne) at 18C and a further four generations at 25C in preparation for the start of our fitness assays. We believe that this period of relaxed selection between the experimental evolution phase and our fitness assays should make it more difficult to detect a fitness difference between the three chromosome types, but could not create any spurious differences between them since all three types were handled similarly. 
+
+$~$
+
 **Creating the genotypes used for experimental evolution**
 
 ```{r}
@@ -59,7 +84,7 @@ img <- readPNG("Figure_S1.png")
 grid.raster(img)
 ```
 
-**Figure S1**. Crossing scheme used to integrate the GFP constructs and _ap^XA^_ marked translocated second and third chromosome balancers into the LH~M~ genetic background. We replicated the crosses 12 times to supply the flies used in generation zero of experimental evolution; 6 times using the _Ubi_ GFP construct and 6 times with the _3xP_ construct. G = generation.
+**Figure S1**. Crossing scheme used to integrate the GFP constructs and _ap^XA^_ marked translocated second and third chromosome balancers into the LH~M~ genetic background. We replicated the crosses 12 times to supply the flies used in generation zero of experimental evolution; 6 times using the _Ubi_ GFP construct and 6 times with the _3xP_ GFP construct. We performed each cross across 25 vials, with 16 females and 16 males in each, to preserve genetic variation in our evolving populations. G = generation.
 
 $~$
 
