@@ -24,7 +24,6 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = FAL
 # Load packages
 
 ```{r}
-library(Matrix) # my pc needs this to load the tidyverse correctly
 library(tidyverse) # tidy style coding
 library(png) # to load images
 library(grid) # to plot images
@@ -38,6 +37,9 @@ library(kableExtra) # tables
 library(patchwork) # putting plots together
 library(DT) # for search- and saveable tables
 library(pander) # for simpler tables
+library(stickylabeller) # for labelling facets in ggplot
+library(ggtext) # for markdown notation in labs
+library(geomtextpath) # for labelling contours
 
 ```
 
@@ -48,31 +50,6 @@ $~$
 **LH~M~ culturing**
 
 We maintained this LH~M~ stock in our laboratory for 32 generations prior to creating the genotypes required for experimental evolution. We cultured LH~M~ at 25C, with a 16-8 light-dark cycle and reared in vials (95mm x 25mm) on a corn-meal, yeast and dextrose-based diet (recipe in Table S1; ~8cm3 of food medium per vial) supplemented with dried yeast, at a population size of at least 800 breeding individuals across 25 vials (16 flies of each sex per vial, following Rice _et al_. 2005). Each generation begins by pooling the offspring produced across the 25 vials and randomly assorting 16 female-male pairs to 25 new vials. We then allow these breeding individuals 48 hours to interact and mate, before transferring them to another set of new vials. After 24 hours of egg-laying, we discard all adults, and allow juveniles 12 days to compete for resources, pupate and eclose as adults. We then iteratively repeat this process each generation to maintain the population.
-
-$~$
-
-**The recombination compartment**
-
-$~$
-
-_The female recombination compartment_ 
-
-When we initiated the first generation of experimental evolution for each of the sex-limited populations, we placed 12 females with the _FLA/FLA_ genotype into individual food vials, each containing a _FLA/ap^XA^_ male. We allowed them ~24 hours to mate, then discarded the males and pooled the 12 females into a single vial. After ~72 hours we discarded the females and allowed their offspring to develop. The aim of this breeding design was to minimise selection acting on the _FLA/ap^XA^_ males, since each male simply needed to survive and then fertilise one randomly assigned virgin female. 
-From the progeny, we collected 24 virgin female offspring with the genotype _FLA/FLA_, where recombination had occurred between the homologous _FLA_ chromosomes. Half of these females were used to establish the next iteration of the recombination compartment, where they were again individually mated to 12 _FLA/ap^XA^_ males sourced from the progeny of the main population. The 12 remaining _FLA/FLA_ females, which carried one set of recombined _FLA_ autosomes inherited from their mother, were randomly substituted for 12 females in the main breeding population. Therefore, 6% of the females in each generation came from the recombination compartment (Figure 1). 
-
-_The male recombination compartment_
-
-At the start of the first generation for each sex-limited population, we placed 12 females with genotype _MLA/ap^XA^_ into a single food vial along with 12 _MLA/ap^XA^_ males. We allowed ~24 hours for the males to compete for fertilisations, after which we discarded the males and moved the females into individual food vials to oviposit. We collected one female and one male _MLA/MLA_ offspring from each of the oviposition vials. This rearing protocol minimised selection on females, since females were reared mostly in a competition- and harassment-free environment, and we equalised fitness by collecting a standard number of progeny from each female. The 12 males were randomly substituted for 12 males in the main breeding population breeding population (carrying recombined _MLA_ autosomes inherited from their mother), and the 12 females were used in the next iteration of the male recombination compartment. Therefore, 6% of the males in each generation came from the recombination compartment (Figure 1).
-
-We also included a female and male recombination compartment for each of the four control populations. The process was identical as for the sex-limited populations, except that control autosomes can be substituted in the above descriptions for female- or male-limited autosomes.  
-
-$~$
-
-**Creating populations homozygous for sex-limited autosomes**
-
-$~$ 
-
-After 20 generations of experimental evolution, the Covid-19 pandemic necessitated that we cease regular laboratory work. In order to preserve the genetic composition of the evolved populations in a form that did not require intensive maintenance, we conducted crosses which converted our 8 replicate populations into 12 populations carrying only one chromosome type ( _FLA_, _MLA_, or _CA_). To create the 4 _FLA_ populations, we crossed 200 male and 200 female _FLA/ap^XA^_ individuals from each of the 4 sex-limited populations, producing _FLA/ap^XA^_ and _FLA/FLA_ offspring. These offspring were tipped into new food vials and allowed to breed freely, and a sample of the resulting population was transferred to new food vials every two weeks (at a population size of 13 vials each containing 8 females and 8 males, keeping the population size of chromosomes the same – offspring were pooled across the vials when setting up the next generation). We similarly created and propagated four populations carrying _MLA_ and four carrying _CA_ alleles. The _ap^XA^_ balancer chromosomes are deleterious or lethal, and so the balancer was rapidly lost from all 12 populations. We maintained each line under these conditions for 16 generations (i.e. until the easing of Covid-19 lockdown restrictions in Melbourne) at 18C and a further four generations at 25C in preparation for the start of our fitness assays. We believe that this period of relaxed selection between the experimental evolution phase and our fitness assays should make it more difficult to detect a fitness difference between the three chromosome types, but could not create any spurious differences between them since all three types were handled similarly. 
 
 $~$
 
@@ -95,6 +72,946 @@ tibble("Ingredients" = c("Soy flour", "Cornmeal", "Yeast", "Dextrose", "Agar", "
        "Quantity" = c("20 g", "73 g", "35 g", "75 g", "6 g", "1000 mL", "17 mL", "14 mL")) %>% 
   pander(split.cell = 40, split.table = Inf)
 ```
+
+$~$
+
+**The recombination compartment**
+
+$~$
+
+_The female recombination compartment_ 
+
+When we initiated the first generation of experimental evolution for each of the sex-limited populations, we placed 12 females with the _FLA/FLA_ genotype into individual food vials, each containing a _FLA/ap^XA^_ male. We allowed them ~24 hours to mate, then discarded the males and pooled the 12 females into a single vial. After ~72 hours we discarded the females and allowed their offspring to develop. The aim of this breeding design was to minimise selection acting on the _FLA/ap^XA^_ males, since each male simply needed to survive and then fertilise one randomly assigned virgin female. 
+From the progeny, we collected 24 virgin female offspring with the genotype _FLA/FLA_, where recombination had occurred between the homologous _FLA_ chromosomes. Half of these females were used to establish the next iteration of the recombination compartment, where they were again individually mated to 12 _FLA/ap^XA^_ males sourced from the progeny of the main population. The 12 remaining _FLA/FLA_ females, which carried one set of recombined _FLA_ autosomes inherited from their mother, were randomly substituted for 12 females in the main breeding population. Therefore, 6% of the females in each generation came from the recombination compartment (Figure 1). 
+
+_The male recombination compartment_
+
+At the start of the first generation for each sex-limited population, we placed 12 females with genotype _MLA/ap^XA^_ into a single food vial along with 12 _MLA/ap^XA^_ males. We allowed ~24 hours for the males to compete for fertilisations, after which we discarded the males and moved the females into individual food vials to oviposit. We collected one female and one male _MLA/MLA_ offspring from each of the oviposition vials. This rearing protocol minimised selection on females, since females were reared mostly in a competition- and harassment-free environment, and we equalised fitness by collecting a standard number of progeny from each female. The 12 males were randomly substituted for 12 males in the main breeding population breeding population (carrying recombined _MLA_ autosomes inherited from their mother), and the 12 females were used in the next iteration of the male recombination compartment. Therefore, 6% of the males in each generation came from the recombination compartment (Figure 1).
+
+We also included a female and male recombination compartment for each of the four control populations. The process was identical as for the sex-limited populations, except that control autosomes can be substituted in the above descriptions for female- or male-limited autosomes.  
+
+$~$
+
+## Modelling the effect of the relaxed selection phase
+
+$~$
+
+Relaxation of sex-limited inheritance may have allowed sexually antagonistic allele frequencies to rebound back to their original pre-treatment equilibria, nullifying any effect of our experiment. To assess the effect of the relaxed selection phase on our experiment, we built a single-locus, two-allele population genetic model. The model contains three phases: in phase one, we recapitulated prior theory to find the conditions where intralocus sexual conflict is expected to maintain polymorphism. These conditions provide a baseline expectation for the characteristics of the alleles targeted by our expeirmental evolution treatments. Then, in phase two,  we modelled how allele frequencies are expected to change under 20 generations of sex-limited evolution. Finally, in phase three, we modelled rebound change in allele frequency when sex-limited evolution was relaxed. 
+
+In each phase, the model follows the dynamics of a single autosomal locus with two alleles, $A_f$ and $A_m$, which have frequencies _p_ and 1 - _p_, respectively. For simplicity, we assume an infinite population size, discrete, non-overlapping generations and panmixia with respect to the focal locus. Following previous models of sexual antagonism (Kidwell et al, 1977; Rice, 1984; Connallon _et al_, 2009; Patten, _et al_, 2010), we create intralocus sexual conflict by coding the $A_f$ allele to have greater fitness than the $A_m$ allele when expressed in females, while the $A_m$ allele has greater fitness than the $A_f$ allele when expressed in males. The fitness benefits of being homozygous for the 'correct' allele in the 'correct' sex are represented by $s_f$ and $s_m$ (previous models have generally considered the cost of being homozygous for the wrong allele; we make this small change to improve the conceptual flow between the three phases of our model). In heterozygotes, these benefits are moderated by the sex-specific dominance coefficients, $h_f$ and $h_m$ (following Curtsinger _et al_ 1994). When $h_f = 0$, the $A_f$ allele is fully recessive when expressed in females, and fully dominant when $h_f = 1$. Modelling sex-specific dominance allows us to explore dominance reversals, where the $A_f$ allele is dominant in one sex but recessive in the other, a mechanism that has previously been shown to facilitate balancing selection (reviewed in Connallon and Chenoweth, 2019). Table S2 shows the sex-specific fitness of each genotype. 
+
+```{r}
+tibble(Sex = c("Female", "Male"),
+       "$A_fA_f$" = c("$1 + s_f$", "1"),
+       "$A_fA_m$" = c("$1 + s_fh_f$", "$1 + s_mh_m$"),
+       "$A_mA_m$" = c("1", "$1 + s_m$")) %>% 
+kbl(format = "html", booktabs = T, escape = FALSE,
+    caption = "<b>Table S2<b>. Effects of genotype on sex-specific fitness") %>%
+  kable_styling() %>% 
+  add_header_above(c(" " = 1, "Genotypes" = 3))
+```
+
+$~$
+
+### Phase 1: modelling polymorphism under intralocus sexual conflict
+
+#### Calculating the per generation change in allele frequency
+
+To find regions of stable polymorphism created by intralocus sexual conflict, we first find the within generation change in allele frequency following selection. For females the recursion equation is 
+
+\begin{equation}
+p'_f = \frac{p^2(1 + s_f) + \frac{1}{2}[2p(1-p)] (1 + s_fh_f)}{p^2(1 + s_f) + [2p(1-p)] (1 + s_fh_f) + (1 - p)^2}
+\end{equation}
+
+and for males
+
+\begin{equation}
+p'_m = \frac{p^2 + \frac{1}{2}[2p(1-p)] (1 + s_m h_m)}{p^2 + [2p(1-p)] (1 + s_mh_m) + (1 - p)^2(1 + s_m)}
+\end{equation}
+
+Assuming an even primary sex ratio and mendelian inheritance, the $A_f$ allele frequency in the following generation is
+
+\begin{equation}
+p = \frac{p'_f + p'_m}{2}
+\end{equation}
+
+We then used equation 3 to numerically determine the selective conditions required for polymorphism at this locus. We explored a parameter space of varying values of _s~f~_, _s~m~_, _h~f~_ and _h~m~_, as these parameters have previously been found to be important factors in determining polymorphism (Kidwell _et al_, 1977; Curtsinger _et al_, 1994). We set the initial frequency of the $A_f$ allele to 0.01 and iterated until 10000 generations had elapsed. 
+
+Test that the equation is correct by inputing some values for each parameter:
+
+```{r}
+s_m <- 0.7
+
+s_f <- 0.6
+
+p <- 0.01
+
+h_m <- 0.5
+
+h_f <- 0.5
+
+# female freq after selection
+
+f_2 <- ((p^2)*(1 + s_f) + 0.5*(2*p*(1 - p))*(1 + s_f*h_f))/(
+ (p^2)*(1 + s_f) + (2*p*(1 - p))*(1 + s_f*h_f) + (1-p)^2
+)
+
+# male freq after selection
+
+m_2 <- ((p^2) + 0.5*(2*p*(1 - p))*(1 + s_m*h_m))/(
+ (p^2) + (2*p*(1 - p))*(1 + s_m*h_m) + ((1-p)^2)*(1 + s_m)
+)
+
+(f_2 + m_2)/2
+             
+```
+
+#### Build the diploid simulation function
+
+Now that we can calculate the _A~f~_ allele frequency across generations, we can find conditions where stable polymorphism is possible. To do this we build a simulation where the _A~f~_ allele is initially rare, but changes in frequency over the course of 10000 generations.  
+
+```{r}
+run_diploid_simulation <- function(gens_1, row, parameters){
+  
+  
+  generations_1 <- gens_1
+  s_f <- parameters$s_f[row]
+  s_m <- parameters$s_m[row]
+  h_f <- parameters$h_f[row]
+  h_m <- parameters$h_m[row]
+  initial_freq_F <- parameters$initial_freq_F[row]
+  
+  
+  # Make the initial population
+  pop <- 
+    tibble(prop_1 = c(initial_freq_F),
+           generations_1 = gens_1)
+  
+  
+  current_generation <- 1
+  
+  # Iterate over generations
+  
+  while(current_generation <= generations_1){
+    pop <- pop %>%
+      mutate(# here's the effect of selection
+        f_freq_after_selection = ((prop_1^2)*(1 + s_f) + 0.5*(2*prop_1*(1 - prop_1))*(1 + s_f*h_f))/(
+          (prop_1^2)*(1 + s_f) + (2*prop_1*(1 - prop_1))*(1 + s_f*h_f) + (1-prop_1)^2),
+        
+        m_freq_after_selection = ((prop_1^2) + 0.5*(2*prop_1*(1 - prop_1))*(1 + s_m*h_m))/(
+          (prop_1^2) + (2*prop_1*(1 - prop_1))*(1 + s_m*h_m) + ((1-prop_1)^2)*(1 + s_m)),
+        
+        prop_1 = (f_freq_after_selection + m_freq_after_selection)/2,
+        generations_1 = gens_1)
+    
+    # Otherwise, increment generation counter by 1 and return to top of the 'while' loop
+    
+    current_generation <- current_generation + 1
+  }
+  
+  pop %>% bind_cols(parameters[row, ]) # returns the final pop
+  
+}
+
+```
+
+#### Define the relevant parameter space
+
+We vary $s_f$, $s_m$, $h_f$ and $h_m$ as these have previously been found to be important factors in determining polymorphism.
+
+```{r}
+ 
+resolution <- 21
+
+equilibrium_parameters <- 
+  expand_grid(
+    s_f = c(seq(0, 1, length = resolution*4)),
+    s_m = c(seq(0, 1, length = resolution*4)),
+    h_f = c(0, 0.25, 0.5, 0.75, 1),
+    h_m = c(0, 0.25, 0.5, 0.75, 1),
+    initial_freq_F =  0.01) %>%  
+  mutate(parameter_space_ID = row_number())
+```
+
+#### Run the phase 1 simulation
+
+```{r}
+if(!file.exists("polymorphism_results.csv")){
+  polymorphism_results <- run_diploid_simulation(gens_1 = 10000, 1:nrow(equilibrium_parameters), equilibrium_parameters)
+  write_csv(polymorphism_results, file = "polymorphism_results.csv")
+} else polymorphism_results <- read_csv("polymorphism_results.csv")
+```
+
+#### Plot the results
+
+```{r, fig.height=12, fig.width=10}
+
+pal1 <- met.brewer("Hiroshige", n=20, direction = -1)
+
+
+polymorphism_results %>%
+  mutate(Dominance = case_when(h_f == 0.5 & h_m == 0.5 ~ "Additive",
+                               h_f == 1 & h_m == 0 ~ "Dominant",
+                               h_f == 0 & h_m == 1 ~ "Recessive",
+                               h_f == 0.25 & h_m == 0.25 ~ 
+                                 "Deleterious dominance reversal (partial)",
+                               h_f == 0.75 & h_m == 0.75 ~ 
+                                 "Beneficial dominance reversal (partial)",
+                               h_f == 1 & h_m == 1 ~ 
+                                 "Beneficial dominance reversal (complete)",
+                               .default = NA)) %>% 
+  filter(Dominance == "Additive" | 
+           Dominance == "Dominant" |
+           Dominance == "Recessive" |
+           Dominance == "Beneficial dominance reversal (partial)" |
+           Dominance == "Beneficial dominance reversal (complete)" |
+           Dominance == "Deleterious dominance reversal (partial)") %>% 
+  mutate(Dominance = fct_relevel(Dominance, 
+                                 "Additive",
+                                 "Dominant",
+                                 "Recessive",
+                                 "Deleterious dominance reversal (partial)", 
+                                 "Beneficial dominance reversal (partial)", 
+                                 "Beneficial dominance reversal (complete)")) %>% 
+  mutate(prop_1 = round(prop_1, 3)) %>% 
+  ggplot(aes(x = s_f, y = s_m)) +
+  geom_blank() +
+  geom_raster(aes(fill = prop_1), alpha = 0.75) +
+  scale_fill_gradientn(colours = pal1, breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1), 
+                       limits = c(0, 1)) +
+  stat_contour(aes(z = prop_1), colour = "black", breaks = c(0.01, 0.99),
+               linetype = 2, linewidth = 1) +
+  #stat_contour(aes(z = prop_1), colour = "black", breaks = c(0.2, 0.4, 0.6, 0.8),
+  #            linetype = 1, linewidth = 0.5) +
+  geom_textcontour(aes(z = prop_1), breaks = c(0.2, 0.4, 0.6, 0.8), size = 3, 
+                   straight = TRUE) +
+  facet_wrap(~ Dominance, 
+             scales = "free", nrow = 3, strip.position = c("top"),
+             labeller = label_glue('({.l}) {`Dominance`}')) +
+  labs(y = "_s~m~_", 
+       x = "_s~f~_",
+       fill = "_A~f~_ allele freq") +
+  guides(fill = guide_colourbar(barheight = 15)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme(panel.border = element_rect(fill = NA, colour = "black", linewidth = .8),
+        strip.background = element_rect(colour = "black", fill = "Aliceblue", linewidth = .8),
+        text =  element_text(size = 12),
+        axis.title.x = element_markdown(size = 18),
+        axis.title.y = element_markdown(size = 18),
+        legend.position = "right",
+        legend.box.just = "right",
+        legend.margin = margin(6, 6, 6, 6),
+        strip.text.x = element_text(size = 11),
+        legend.title = ggtext::element_markdown())
+```
+
+**Figure S2**: Predicted equilibrium frequency of the $A_f$ allele, calculated from the population genetic model. The plot shows how varying the strength of the selection coefficient in females ($s_f$) and males ($s_m$) affects the fate of the $A_f$ allele. The dashed lines enclose the parameter space where the $A_f$ allele is predicted to stabilise at an intermediate frequency. Areas above and to the left of the upper dashed line indicate conditions where the allele is purged from the population, and areas below and to the right of the lower line indicate conditions where the allele spreads to fixation. Six dominance conditions are plotted. **a** additive expression, where $h_f = h_m = 0.5$. **b** dominant expression of the $A_f$ allele, where $h_f = 1$ and $h_m = 0$. **c** recessive expression of the $A_f$ allele, where $h_f = 0$ and $h_m = 1$. **d** partial deleterious dominance reversal, where the $A_f$ allele is recessive in females ($h_f = 0.25$) and dominant in males ($h_m = 0.25$, where this is the dominance of the $A_m$ allele). **e** and **f** show cases of beneficial dominance reversal, where the $A_f$ allele is dominant when expressed in a female and recessive when expressed in a male. **e** shows an intermediate case where dominance is incomplete $h_f = 0.75$ and $h_m = 0.75$, while **f** depicts the parameter space for polymorphism when beneficial dominance reversal is complete ($h_f = 1$ and $h_m = 1$). 
+
+As found previously, the conditions for polymorphism are very restrictive when selection is weak, but expand significantly when selection is strong and/or there is beneficial reversal of dominance i.e. when the $A_f$ allele is (partially) dominant in females and (partially) recessive in males. Panel **d** shows why deleterious dominance reversal is not expected to be commonly observed in the genome. To contextualise $s_f$ and $s_m$, a value of 0.5 indicates that the focal allele is 50% fitter than its alternative in that particular environment, while a value of 1 indicates it has twice the fitness of the alternative.  
+
+$~$
+
+### Phase 2: modelling allele frequency change under sex-limited evolution
+
+#### Calculating the per generation change in allele frequency
+
+To predict the effect of sex-limited experimental evolution, we simulate the evolution of a female-beneficial, sexually antagonistic allele over 20 generations of female-limited inheritance. Our synthetic sex-limited inheritance regimes create haploid populations of autosomes, that are nearly always (see recombination compartment) expressed as heterozygotes with non-evolving, single genotype populations of balancer homologs, with which they cannot recombine. We therefore model the locus as haploid, with the exception that dominance relations can affect the strength of selection. The extent to which dominance matters is contingent upon whether the $A_f$ allele is present at the locus on the non-evolving balancer. If so, the $A_f$ allele will always be expressed, if not, dominance relations matter. We model the homozygous and heterozygous cases using two related equations.
+
+To model evolution under female-limited inheritance when the evolving and non-evolving allele are homozygous, we use equation 1 presented in Dapper _et al_ (2023). The $A_f$ allele experiences conditions akin to a maternally inherited cytoplasmic allele. The change in allele frequency due to selection per generation is now
+
+\begin{equation}
+\Delta p = \frac{s_fpq}{W_{f-limited}}
+\end{equation}
+
+where $W_{f-limited} = 1 + s_fp$.
+
+We then model the effect of female-limited inheritance when the balancer does not carry the $A_f$ allele. The new equation takes the form
+
+\begin{equation}
+\Delta p = \frac{s_fh_fpq}{W_{f-limited}}
+\end{equation}
+
+where $W_{f-limited} = 1 + s_fh_fp$.
+
+This equation helps point out that our design targets only those alleles that are expressed against the balancer genetic background. We therefore expect no response to selection for fully recessive alleles heterozygous with alternative alleles carried by the balancer chromosomes.  
+
+
+#### Modeling with or without dominance {.tabset .tabset-fade .tabset-pills}
+
+##### Dominance doesn't matter
+
+**Build the function**
+
+```{r}
+run_haploid_simulation_no_dominance <- function(gens_2, row, parameters){
+  
+  # Get the focal parameter space out of parameters[row], this makes it easier later
+  
+  generations <- gens_2
+  prop_1 <- parameters$prop_1[row]
+  s_f <- parameters$s_f[row]
+  
+  # Make the initial population
+  pop <- 
+    tibble(
+      prop_2 = c(prop_1),
+      W_female = 1 + prop_2*s_f)
+  
+  
+  current_generation <- 1
+  
+  # Iterate over generations
+  
+  while(current_generation <= generations){
+    
+    
+    pop <- pop %>%
+      mutate(W_female = 1 + prop_2*s_f, # mean fitness changes as allele freqs change
+             prop_2 = prop_2 + (s_f*prop_2*(1 - prop_2))/W_female, # here's the effect of selection
+             generations_2 = gens_2)
+    
+    # Otherwise, increment generation counter by 1 and return to top of the 'while' loop
+    
+    current_generation <- current_generation + 1
+  }
+  
+  pop %>% bind_cols(parameters[row, ]) # returns the final pop
+  
+}
+
+```
+
+**Define the relevant parameter space**
+
+```{r}
+
+parameters_haploid_no_dominance <- 
+  expand_grid(prop_1 = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
+              s_f = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1))
+
+```
+
+**Run the haploid simulation**
+
+```{r}
+
+haploid_results_no_dominance <- 
+  run_haploid_simulation_no_dominance(gens_2 = 1, 1:nrow(parameters_haploid_no_dominance), parameters_haploid_no_dominance) %>% 
+  mutate(generations_2 = 0, prop_2 = prop_1) %>% 
+  bind_rows(map_dfr(1:20, run_haploid_simulation_no_dominance, 1:nrow(parameters_haploid_no_dominance), parameters_haploid_no_dominance)) %>%
+  mutate(selection = as.factor(s_f),
+         `Initial allele frequency` = as.factor(prop_1))
+```
+
+##### Dominance matters
+
+**Build the function**
+
+```{r}
+run_haploid_simulation_dominance <- function(gens_2, row, parameters){
+  
+  # Get the focal parameter space out of parameters[row], this makes it easier later
+  
+  generations <- gens_2
+  prop_1 <- parameters$prop_1[row]
+  s_f <- parameters$s_f[row]
+  h_f <- parameters$h_f[row]
+  
+  
+  # Make the initial population
+  pop <- 
+    tibble(
+      prop_2 = c(prop_1),
+      W_female = 1 + prop_2*s_f*h_f)
+  
+  
+  current_generation <- 1
+  
+  # Iterate over generations
+  
+  while(current_generation <= generations){
+    
+    
+    pop <- pop %>%
+      mutate(W_female = 1 + prop_2*s_f*h_f, # mean fitness changes as allele freqs change
+             prop_2 = prop_2 + (s_f*h_f*prop_2*(1 - prop_2))/W_female, # here's the effect of selection
+             generations_2 = gens_2)
+    
+    # Otherwise, increment generation counter by 1 and return to top of the 'while' loop
+    
+    current_generation <- current_generation + 1
+  }
+  
+  pop %>% bind_cols(parameters[row, ]) # returns the final pop
+  
+}
+
+```
+
+**Define the relevant parameter space**
+
+```{r}
+
+parameters_haploid_dominance <- 
+  expand_grid(prop_1 = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
+              s_f = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1),
+              h_f = c(0, 0.25, 0.5, 0.75, 1))
+
+```
+
+**Run the haploid simulation**
+
+```{r}
+
+haploid_results_dominance <- 
+  run_haploid_simulation_dominance(gens_2 = 1, 1:nrow(parameters_haploid_dominance), parameters_haploid_dominance) %>% 
+  mutate(generations_2 = 0, prop_2 = prop_1) %>% 
+  bind_rows(map_dfr(1:20, run_haploid_simulation_dominance, 1:nrow(parameters_haploid_dominance), parameters_haploid_dominance)) %>%
+  mutate(selection = as.factor(s_f),
+         `Initial allele frequency` = as.factor(prop_1))
+```
+
+#### Plot the results
+
+```{r, fig.height=12, fig.width=14}
+  
+h_1 <-
+  haploid_results_no_dominance %>%
+  filter(`Initial allele frequency` != 0.9) %>% 
+  ggplot(aes(x = generations_2, y = prop_2, group = selection, colour = s_f)) +
+  geom_line(linewidth = 0.8) +
+  scale_colour_gradientn(colours = pal1, limits = c(0.01, 1), 
+                         breaks = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  guides(colour = guide_colourbar(barheight = 20)) +
+  facet_wrap(~`Initial allele frequency`, labeller = label_glue(
+    'Initial _A~f~_ allele freq: {`Initial allele frequency`}')) +
+  labs(x = "Generations of female-limited inheritance",
+       y = "Frequency of the female-benefiting (_A~f~_) allele",
+       title = "(a) Allele always expressed",
+       colour = "_s~f~_") +
+  scale_x_continuous(breaks = c(0, 5, 10, 15, 20), limits = c(0, 20)) +
+  theme_bw() +
+  theme(axis.title.y = element_markdown(size = 14),
+        axis.title.x = element_text(size = 14),
+        legend.title = element_markdown(size = 14),
+        strip.background = element_rect(fill = "Aliceblue", linewidth = .5),
+        strip.text = element_markdown(),
+        legend.margin = margin(6, 6, 6, 6),
+        plot.title = element_markdown())
+
+h_2 <-  
+  haploid_results_dominance %>% 
+  filter(h_f == 1,
+         `Initial allele frequency` != 0.9) %>% 
+  ggplot(aes(x = generations_2, y = prop_2, group = selection, colour = s_f)) +
+  geom_line(linewidth = 0.8) +
+  scale_colour_gradientn(colours = pal1, limits = c(0.01, 1), 
+                         breaks = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  guides(colour = guide_colourbar(barheight = 20)) +
+  facet_wrap(~`Initial allele frequency`, labeller = label_glue(
+    'Initial _A~f~_ allele freq: {`Initial allele frequency`}')) +
+  labs(x = "Generations of female-limited inheritance",
+       y = "Frequency of the female-benefiting (_A~f~_) allele",
+       title = "(b) _h~f~_ = 1",
+       colour = "_s~f~_") +
+  scale_x_continuous(breaks = c(0, 5, 10, 15, 20), limits = c(0, 20)) +
+  theme_bw() +
+  theme(axis.title.y = element_markdown(size = 14),
+        axis.title.x = element_text(size = 14),
+        legend.title = element_markdown(size = 14),
+        strip.background = element_rect(fill = "Aliceblue", linewidth = .5),
+        strip.text = element_markdown(),
+        legend.margin = margin(6, 6, 6, 6),
+        plot.title = element_markdown())
+
+h_3 <-
+  haploid_results_dominance %>% 
+  filter(h_f == 0.5,
+         `Initial allele frequency` != 0.9) %>% 
+  ggplot(aes(x = generations_2, y = prop_2, group = selection, colour = s_f)) +
+  geom_line(linewidth = 0.8) +
+  scale_colour_gradientn(colours = pal1, limits = c(0.01, 1), 
+                         breaks = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  guides(colour = guide_colourbar(barheight = 20)) +
+  facet_wrap(~`Initial allele frequency`, labeller = label_glue(
+    'Initial _A~f~_ allele freq: {`Initial allele frequency`}')) +
+  labs(x = "Generations of female-limited inheritance",
+       y = "Frequency of the female-benefiting (_A~f~_) allele",
+       title = "(c ) _h~f~_ = 0.5",
+       colour = "_s~f~_") +
+  scale_x_continuous(breaks = c(0, 5, 10, 15, 20), limits = c(0, 20)) +
+  theme_bw() +
+  theme(axis.title.y = element_markdown(size = 14),
+        axis.title.x = element_text(size = 14),
+        legend.title = element_markdown(size = 14),
+        strip.background = element_rect(fill = "Aliceblue", linewidth = .5),
+        strip.text = element_markdown(),
+        legend.margin = margin(6, 6, 6, 6),
+        plot.title = element_markdown())
+
+h_4 <-
+  haploid_results_dominance %>% 
+  filter(h_f == 0.25,
+         `Initial allele frequency` != 0.9) %>% 
+  ggplot(aes(x = generations_2, y = prop_2, group = selection, colour = s_f)) +
+  geom_line(linewidth = 0.8) +
+  scale_colour_gradientn(colours = pal1, limits = c(0.01, 1), 
+                         breaks = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  guides(colour = guide_colourbar(barheight = 20)) +
+  facet_wrap(~`Initial allele frequency`, labeller = label_glue(
+    'Initial _A~f~_ allele freq: {`Initial allele frequency`}')) +
+  labs(x = "Generations of female-limited inheritance",
+       y = "Frequency of the female-benefiting (_A~f~_) allele",
+       title = "(d) _h~f~_ = 0.25",
+       colour = "_s~f~_") +
+  scale_x_continuous(breaks = c(0, 5, 10, 15, 20), limits = c(0, 20)) +
+  theme_bw() +
+  theme(axis.title.y = element_markdown(size = 14),
+        axis.title.x = element_text(size = 14),
+        legend.title = element_markdown(size = 14),
+        strip.background = element_rect(fill = "Aliceblue", linewidth = .5),
+        strip.text = element_markdown(),
+        legend.margin = margin(6, 6, 6, 6),
+        plot.title = element_markdown())
+
+h_1 + h_2 + h_3 + h_4 +
+  plot_layout(guides = "collect")
+
+```
+
+**Figure S3**: The increase in frequency of the female-beneficial allele across 20 generations of female-limited inheritance. Curves show how varying the female selection coefficient ($s_f$; increasing by increments of 0.1) for the allele changes the evolutionary trajectory, while comparing panels shows how this is affected by the initial $A_f$ allele frequency. **a** the allele is always expressed, as would occur when the balancer homolog allele is also the $A_f$ allele. **b**-**d** show cases where the balancer genotype carries the alternative allele to the $A_f$ allele, where dominance relations matter. 
+
+
+Figure S3 shows that when selection is strong ($s_f > 0.4$), the $A_f$ allele is very likely to reach fixation after 20 generations, except when the allele is rarely expressed. Even when $s_f = 0.1$, the $A_f$ allele can reach high frequencies after 20 generations of sex-limited evolution. The figure also illustrates that allele frequency change is non-linear. At intermediate frequencies change is fastest, whereas it is much slower at the floor or ceiling. Therefore, evolution from intermediate to high frequencies should result in greater change than evolution from high to intermediate frequencies. 
+
+$~$
+
+### Phase 3: can alleles return to their original equilibrium frequencies?
+
+Now we can return to the phase 1 equations to assess the likelihood of alleles evolving back to their pre-experimental evolution frequencies. This time, we run the simulation for 20 generations and calculate $\Delta A_f$, the change in allele frequency from generation 0 to 20 of relaxed biparental inheritance conditions that were enforced prior to the fitness assays.  
+
+#### Define a new parameter space
+
+```{r}
+
+diploid_parameters_2 <- 
+  expand_grid(
+    s_f = c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1),
+    s_m = c(seq(0, 1, length = resolution*4)),
+    h_f = c(0, 0.25, 0.5, 0.75, 1),
+    h_m = c(0, 0.25, 0.5, 0.75, 1),
+    initial_freq_F =  c(seq(0.01, 1, length = resolution*2)))
+  
+```
+
+#### Run the simulation
+
+The populations experienced these conditions for 20 generations, which we can plug into the function.
+
+```{r}
+
+diploid_rebound_results <- 
+    run_diploid_simulation(20, 1:nrow(diploid_parameters_2), diploid_parameters_2)
+
+```
+
+#### Plot the results
+
+```{r, fig.height=15, fig.width=15}
+
+plotting_data <-
+  diploid_rebound_results %>% 
+  mutate(F_change = prop_1 - initial_freq_F,
+         Dominance = case_when(h_f == 0.5 & h_m == 0.5 ~ "Additive",
+                               h_f == 1 & h_m == 0 ~ "Dominant",
+                               h_f == 0 & h_m == 1 ~ "Recessive",
+                               h_f == 0.75 & h_m == 0.75 ~ "Dominance reversal",
+                               #h_f == 0.75 & h_m == 0.25 ~ "Deleterious dominance reversal",
+                               .default = NA)) %>% 
+  filter(!is.na(Dominance),
+         s_f < 0.6) %>% 
+  mutate(Dominance = fct_relevel(Dominance, 
+                                 "Additive", "Dominant", "Recessive", 
+                                 "Dominance reversal"))
+  
+  
+
+#rebound_p1 <-
+plotting_data %>%
+  filter(s_f != 0.01) %>% 
+  ggplot(aes(x = initial_freq_F, y = s_m)) +
+  geom_blank() +
+  geom_raster(aes(fill = F_change), alpha = 0.75) +
+  scale_fill_gradientn(colours = pal1, breaks = c(-1, -0.5, 0, 0.5, 1), limits = c(-1, 1)) +
+  #stat_contour(aes(z = F_change), colour = "black", linetype = 1,
+             # breaks = c(-0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -0.99, 0.1, 0.2, 0.3, 0.4, 0.5)) +
+  geom_textcontour(aes(z = F_change), 
+                   breaks = c(-0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -0.99, 0.1, 0.2, 0.3, 0.4, 0.5),
+                   size = 3, straight = TRUE) +
+  stat_contour(aes(z = F_change), colour = "black", breaks = 0,
+               linetype = 2, linewidth = 1) +
+  
+  facet_wrap(s_f ~ Dominance, 
+             scales = "free", ncol = 4, strip.position = c("top"),
+             labeller = label_glue('{`Dominance`}, _s~f~_ = {`s_f`}')) +
+  labs(y = expression(s[m]), # this might seem backwards,
+       x = "_A~f~_ freq after experimental evolution",
+       fill = "Rebound change in _A~f~_ frequency") +
+  scale_x_continuous(expand = c(0, 0)) + 
+  scale_y_continuous(expand = c(0, 0)) +
+  guides(fill = guide_colourbar(barwidth = 10)) +
+  theme(panel.border = element_rect(fill = NA, colour = "black", linewidth = .8),
+        strip.background = element_rect(colour = "black", fill = "Aliceblue", linewidth = .8),
+        text =  element_text(size = 12),
+        axis.title = element_text(size = 18),
+        axis.title.x = element_markdown(size = 18),
+        legend.title = element_markdown(size = 18),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom",
+        legend.margin = margin(6, 6, 6, 6),
+        strip.text.x = element_markdown(size = 13))
+
+```
+
+**Figure S4**: Predicted rebound in the equilibrium frequency of the $A_f$ allele, after 20 generations of selection in both sexes, calculated from the population genetic model. The plot shows how varying the strength of the selection coefficient in males ($s_m$) and the frequency of the $A_F$ allele at the end of experimental evolution affect the fate of the $A_F$ allele. The dashed line indicates the conditions where no change is predicted for the frequency of the $A_F$ allele. Contours show increments of 0.1 change in frequency, with warm regions indicating positive change and cool regions indicating a decline in frequency. Four dominance conditions are plotted across the columns: additivity, complete dominance, complete recessiveness and beneficial dominance reversal, where the $A_F$ allele is partially dominant when expressed in a female ($h_f = 0.75$) and partially recessive when expressed in a male ($h_m = 0.75$, where this refers to the dominance of the _M_ allele in males). The selection coefficient in females ($s_f$) increases down the rows. Only cases where $s_f$ tangibly changes allele frequencies while plausibly maintaining polymorphism during the sex-limited evolution phase are plotted.
+
+Figure S4 shows that the $A_f$ allele can decline in frequency when $s_m$ is large relative to $s_f$. However, as indicated by the dashed line's position on the x axis in many of the panels, when selection is relatively equal between the sexes, very little change in frequency is predicted. Even when the $A_m$ allele is dominant in males (e.g. Figure S4 columns 3-4), movement from high to intermediate frequencies requires $s_m$ to be substantially stronger than $s_m$.
+
+$~$
+
+### Integrate the phases into a single simulation
+
+#### Tweak the diploid simulation function
+
+We need to tweak the `run_diploid_simulation` function to take the appropriate parameter values calculated in the prior simulation phases. The new `run_diploid_simulation_2` function is identical, except it now accepts parameters with new names e.g. `gens_3` instead of `gens_1` and `prop_2` instead of `initial_freq_F`. It also generates parameters with new names e.g. `generations_3` and `prop_3`.
+
+```{r}
+
+run_diploid_simulation_2 <- function(gens_3, row, parameters){
+  
+  
+  generations_3 <- gens_3
+  s_f <- parameters$s_f[row]
+  s_m <- parameters$s_m[row]
+  h_f <- parameters$h_f[row]
+  h_m <- parameters$h_m[row]
+  prop_2 <- parameters$prop_2[row]
+  
+  
+  # Make the initial population
+  pop <- 
+    tibble(prop_3 = c(prop_2),
+           generations_3 = gens_3)
+  
+  
+  current_generation <- 1
+  
+  # Iterate over generations
+  
+  while(current_generation <= generations_3){
+    pop <- pop %>%
+     mutate(# here's the effect of selection
+      f_freq_after_selection = ((prop_3^2)*(1 + s_f) + 0.5*(2*prop_3*(1 - prop_3))*(1 + s_f*h_f))/(
+       (prop_3^2)*(1 + s_f) + (2*prop_3*(1 - prop_3))*(1 + s_f*h_f) + (1-prop_3)^2),
+      m_freq_after_selection = ((prop_3^2) + 0.5*(2*prop_3*(1 - prop_3))*(1 + s_m*h_m))/(
+       (prop_3^2) + (2*prop_3*(1 - prop_3))*(1 + s_m*h_m) + ((1-prop_3)^2)*(1 + s_m)),
+      prop_3 = (f_freq_after_selection + m_freq_after_selection)/2,
+     generations_3 = gens_3)
+    
+    # Otherwise, increment generation counter by 1 and return to top of the 'while' loop
+    
+    current_generation <- current_generation + 1
+  }
+  
+  pop %>% bind_cols(parameters[row, ]) # returns the final pop
+  
+}
+
+```
+
+#### Build the combined function
+
+```{r}
+
+combined_function <- function(parameters, gens_1, gens_2, gens_3){
+  # phase 1
+  
+  polymorphism_results <- run_diploid_simulation(gens_1, 1:nrow(parameters), parameters) %>% 
+    # just get the relevant cases we explore
+    mutate(Dominance = case_when(h_f == 0.5 & h_m == 0.5 ~ "Additive",
+                                 h_f == 0 & h_m == 1 ~ "Recessive (complete)",
+                                 h_f == 0.25 & h_m == 0.75 ~ "Recessive (partial)",
+                                 h_f == 1 & h_m == 0 ~ "Dominant",
+                                 h_f == 0.25 & h_m == 0.25 ~ 
+                                   "Deleterious dominance reversal (partial)",
+                                 h_f == 0.75 & h_m == 0.75 ~ 
+                                   "Beneficial dominance reversal (partial)",
+                                 h_f == 1 & h_m == 1 ~ 
+                                   "Beneficial dominance reversal (complete)",
+                                 .default = NA)) %>% 
+    filter(!is.na(Dominance)) %>% 
+    mutate(prop_1 = case_when(prop_1 > 0.999 ~ 1,
+                              prop_1 < 0.001 ~ 0,
+                              .default = prop_1)) %>% 
+    select(!contains("after")) # we don't need these to run the subsequent phases
+  
+  # phase 2
+  
+  haploid_results <- 
+    run_haploid_simulation_dominance(gens_2, 1:nrow(polymorphism_results), 
+                                     polymorphism_results) %>% 
+    mutate(Dominance_matters = "YES") %>% 
+    select(-W_female) %>% 
+    bind_rows(run_haploid_simulation_no_dominance(gens_2, 1:nrow(polymorphism_results), 
+                                                  polymorphism_results) %>%
+                mutate(Dominance_matters = "NO") %>% 
+                select(-W_female))
+  
+  # phase 3
+  
+  diploid_rebound_results <- 
+    run_diploid_simulation_2(gens_3, 1:nrow(haploid_results), haploid_results)
+  
+  # order relevant columns and remove unnecessary ones for a nice output
+  diploid_rebound_results %>% 
+    select(-c(f_freq_after_selection , m_freq_after_selection )) %>% 
+    select(initial_freq_F, s_f, s_m, h_f, h_m, Dominance, Dominance_matters, prop_1, prop_2, prop_3,
+           generations_1, generations_2, generations_3, parameter_space_ID)
+}
+```
+
+#### Run the combined function
+
+To run the `combined_function` all we have to do is feed it the initial phase 1 parameter space and the generations we would like to run each phase for.
+
+```{r}
+
+if(!file.exists("Integrated_results.csv")){
+  Integrated_results <- combined_function(equilibrium_parameters,
+                                          gens_1 = 10000, # phase 1
+                                          gens_2 = 20, # phase 2
+                                          gens_3 = 20) # phase 3
+  write_csv(Integrated_results, file = "Integrated_results.csv")
+} else Integrated_results <- read_csv("Integrated_results.csv")
+```
+
+#### Plot the results
+
+```{r, fig.height=10, fig.width=14}
+I_1 <- 
+  Integrated_results %>% 
+  filter(Dominance_matters == "YES",
+         Dominance != "Deleterious dominance reversal (partial)") %>% 
+  mutate(Dominance = fct_relevel(Dominance, 
+                                 "Additive", "Dominant",
+                                 "Recessive (complete)",
+                                 "Recessive (partial)",
+                                 "Beneficial dominance reversal (partial)",
+                                 "Beneficial dominance reversal (complete)")) %>% 
+  
+  ggplot(aes(x = s_f, y = s_m)) +
+  geom_blank() +
+  geom_raster(aes(fill = prop_3), alpha = 0.75) +
+  scale_fill_gradientn(colours = pal1, breaks = c(0, 0.25, 0.5, 0.75, 1), limits = c(0, 1)) +
+  #stat_contour(aes(z = prop_3), colour = "black", linetype = 1,
+   #           breaks = c(0.1, 0.25, 0.5, 0.75, 0.9)) +
+  stat_contour(aes(z = prop_3), colour = "black", breaks = c(0.01, 0.99),
+               linetype = 2, linewidth = 1) +
+  
+  facet_wrap( ~ Dominance, 
+             scales = "free", ncol = 2, strip.position = c("top"),
+             labeller = label_glue('{`Dominance`}')) +
+  labs(y = "_s~m~_", 
+       x = "_s~f~_",
+       fill = "Final _A~f~_ allele frequency",
+       title = "(a) Dominance matters in treatment phase") +
+  scale_x_continuous(expand = c(0, 0)) + 
+  scale_y_continuous(expand = c(0, 0)) +
+  guides(fill = guide_colourbar(barwidth = 10)) +
+  theme(panel.border = element_rect(fill = NA, colour = "black", linewidth = .8),
+        strip.background = element_rect(colour = "black", fill = "Aliceblue", linewidth = .8),
+        text =  element_text(size = 11),
+        axis.title.x = element_markdown(size = 20),
+        axis.title.y = element_markdown(size = 20),
+        legend.title = element_markdown(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom",
+        legend.margin = margin(6, 6, 6, 6),
+        strip.text.x = element_text(size = 11))
+
+I_2 <-
+  Integrated_results %>% 
+  filter(Dominance_matters == "NO",
+         Dominance != "Deleterious dominance reversal (partial)") %>% 
+  mutate(Dominance = fct_relevel(Dominance, 
+                                 "Additive", "Dominant",
+                                 "Recessive (complete)",
+                                 "Recessive (partial)",
+                                 "Beneficial dominance reversal (partial)",
+                                 "Beneficial dominance reversal (complete)")) %>% 
+  
+  ggplot(aes(x = s_f, y = s_m)) +
+  geom_blank() +
+  geom_raster(aes(fill = prop_3), alpha = 0.75) +
+  scale_fill_gradientn(colours = pal1, breaks = c(0, 0.25, 0.5, 0.75, 1), limits = c(0, 1)) +
+  #stat_contour(aes(z = prop_3), colour = "black", linetype = 1,
+  #           breaks = c(0.1, 0.25, 0.5, 0.75, 0.9)) +
+  stat_contour(aes(z = prop_3), colour = "black", breaks = c(0.01, 0.99),
+               linetype = 2, linewidth = 1) +
+  
+  facet_wrap( ~ Dominance, 
+              scales = "free", ncol = 2, strip.position = c("top"),
+              labeller = label_glue('{`Dominance`}')) +
+  labs(y = "_s~m~_", 
+       x = "_s~f~_",
+       fill = "Final _A~f~_ allele frequency",
+       title = "(b) Allele always expressed in treatment phase") +
+  scale_x_continuous(expand = c(0, 0)) + 
+  scale_y_continuous(expand = c(0, 0)) +
+  guides(fill = guide_colourbar(barwidth = 10)) +
+  theme(panel.border = element_rect(fill = NA, colour = "black", linewidth = .8),
+        strip.background = element_rect(colour = "black", fill = "Aliceblue", linewidth = .8),
+        text =  element_text(size = 11),
+        axis.title.x = element_markdown(size = 20),
+        axis.title.y = element_markdown(size = 20),
+        legend.title = element_markdown(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom",
+        legend.margin = margin(6, 6, 6, 6),
+        strip.text.x = element_text(size = 11))
+
+I_1 + I_2 +
+  plot_layout(guides = "collect") & theme(legend.position = 'bottom')
+```
+
+**Figure S5**: the final frequency of the $A_f$ allele following sex-limited evolution and subsequent relaxation of sex-limited inheritance. The dashed lines bound the parameter space where polymorphism is still predicted. Note that compared with Figure S2, the parameter space for polymorphism is reduced, as the $A_f$ increases to fixation in many cases during the sex-limited evolution phase. **a** the allele is always expressed during the sex-limited inheritance phase, as would occur when the balancer homolog allele is also the $A_f$ allele. **b**-**d** show cases where the balancer genotype carries the alternative allele to the $A_f$ allele, where dominance relations matter during the sex-limited inheritance phase.
+
+```{r, fig.height=10, fig.width=14}
+
+I_3 <-
+  Integrated_results %>% 
+  mutate(Haploid_change = prop_2 - prop_1,
+         Relaxed_change = prop_3 - prop_2,
+         Total_change = prop_3 - prop_1) %>% 
+  filter(Dominance_matters == "NO",
+         Dominance != "Deleterious dominance reversal (partial)") %>% 
+  mutate(Dominance = fct_relevel(Dominance, 
+                                 "Additive", "Dominant",
+                                 "Recessive (complete)",
+                                 "Recessive (partial)",
+                                 "Beneficial dominance reversal (partial)",
+                                 "Beneficial dominance reversal (complete)")) %>% 
+  ggplot(aes(x = s_f, y = s_m)) +
+  geom_blank() +
+  geom_raster(aes(fill = Total_change), alpha = 0.75) +
+  scale_fill_gradientn(colours = pal1, breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1),
+                       limits = c(-0.05, 1)) +
+  stat_contour(aes(z = Total_change), colour = "black", linetype = 1,
+               breaks = c(0.2, 0.4, 0.6, 0.8)) +
+  #geom_textcontour(aes(z = Total_change), 
+  #               breaks = c(0.2, 0.4, 0.6, 0.8),
+  #              size = 2, straight = TRUE) +
+  stat_contour(aes(z = Total_change), colour = "black", breaks = c(0.01),
+               linetype = 2, linewidth = 1) +
+  
+  facet_wrap( ~ Dominance, 
+              scales = "free", ncol = 2, strip.position = c("top"),
+              labeller = label_glue('{`Dominance`}')) +
+  labs(y = "_s~m~_", 
+       x = "_s~f~_",
+       fill = "Effect of experiment on _A~f~_ freq",
+       title = "(a) Allele always expressed in treatment phase") +
+  scale_x_continuous(expand = c(0, 0)) + 
+  scale_y_continuous(expand = c(0, 0)) +
+  guides(fill = guide_colourbar(barwidth = 10)) +
+  theme(panel.border = element_rect(fill = NA, colour = "black", linewidth = .8),
+        strip.background = element_rect(colour = "black", fill = "Aliceblue", linewidth = .8),
+        text =  element_text(size = 11),
+        axis.title.x = element_markdown(size = 20),
+        axis.title.y = element_markdown(size = 20),
+        legend.title = element_markdown(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom",
+        legend.margin = margin(6, 6, 6, 6),
+        strip.text.x = element_text(size = 11))
+
+
+
+I_4 <-
+  Integrated_results %>% 
+  mutate(Haploid_change = prop_2 - prop_1,
+         Relaxed_change = prop_3 - prop_2,
+         Total_change = prop_3 - prop_1) %>% 
+  filter(Dominance_matters == "YES",
+         Dominance != "Deleterious dominance reversal (partial)") %>% 
+  mutate(Dominance = fct_relevel(Dominance, 
+                                 "Additive", "Dominant",
+                                 "Recessive (complete)",
+                                 "Recessive (partial)",
+                                 "Beneficial dominance reversal (partial)",
+                                 "Beneficial dominance reversal (complete)")) %>% 
+  ggplot(aes(x = s_f, y = s_m)) +
+  geom_blank() +
+  geom_raster(aes(fill = Total_change), alpha = 0.75) +
+  scale_fill_gradientn(colours = pal1, breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1),
+                       limits = c(-0.05, 1)) +
+  stat_contour(aes(z = Total_change), colour = "black", linetype = 1,
+               breaks = c(0.2, 0.4, 0.6, 0.8)) +
+  #geom_textcontour(aes(z = Total_change), 
+  #               breaks = c(0.2, 0.4, 0.6, 0.8),
+  #              size = 2, straight = TRUE) +
+  stat_contour(aes(z = Total_change), colour = "black", breaks = c(0.01),
+               linetype = 2, linewidth = 1) +
+  facet_wrap( ~ Dominance, 
+              scales = "free", ncol = 2, strip.position = c("top"),
+              labeller = label_glue('{`Dominance`}')) +
+  labs(y = "_s~m~_", 
+       x = "_s~f~_",
+       fill = "Effect of experiment on _A~f~_ freq",
+       title = "(b) Dominance matters in treatment phase") +
+  scale_x_continuous(expand = c(0, 0)) + 
+  scale_y_continuous(expand = c(0, 0)) +
+  guides(fill = guide_colourbar(barwidth = 10)) +
+  theme(panel.border = element_rect(fill = NA, colour = "black", linewidth = .8),
+        strip.background = element_rect(colour = "black", fill = "Aliceblue", linewidth = .8),
+        text =  element_text(size = 11),
+        axis.title.x = element_markdown(size = 20),
+        axis.title.y = element_markdown(size = 20),
+        legend.title = element_markdown(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom",
+        legend.margin = margin(6, 6, 6, 6),
+        strip.text.x = element_text(size = 11))
+
+
+
+I_3 + I_4 +
+  plot_layout(guides = "collect") & theme(legend.position = 'bottom')
+```
+
+**Figure S6**: The effects of sex-limited inheritance for 20 generations, followed by 16 generations where a selection response could occur in either sex. The conditions where the $A_f$ allele is expected to increase in frequency are bounded by the dashed lines, outside of which change = 0. Contour lines enclosed within the dashed lines indicate intervals of 0.2, increasing with the warmth of the colour displayed. **a** the allele is always expressed during the sex-limited inheritance phase, as would occur when the balancer homolog allele is also the $A_f$ allele. **b**-**d** show cases where the balancer genotype carries the alternative allele to the $A_f$ allele, where dominance relations matter during the sex-limited inheritance phase.
+
+The combined simulation predicts that the relaxed selection phase should allow a partial shift back to previous frequencies for a subset of sexually antagonistic loci, but that the majority should retain a signature of sex-limited evolution. Areas of no change occur because the allele is predicted to either be fixed or purged from the population prior to the start of the experiment. 
+
+$~$
+
+## References
+
+Kidwell, J. F., M. T. Clegg, F. M. Stewart, and T. Prout. 1977. Regions of stable equilibria for models of differential selection in the two sexes under random mating. _Genetics_ 85:171–183.
+
+Rice, W. R. 1984. Sex Chromosomes and the Evolution of Sexual Dimorphism. _Evolution_ 38:735–742.
+
+Curtsinger, J. W., Service, Philip M., and T. Prout. 1994. Antagonistic Pleiotropy, Reversal of Dominance, and Genetic Polymorphism. _American Naturalist_ 144:210–228.
+
+Connallon, T., R. M. Cox, and R. Calsbeek. 2009. Fitness consequences of sex-specific selection. _Evolution_ 64:1671–1682.
+
+Patten, M. M., D. Haig, and F. Ubeda. 2010. Fitness variation due to sexual antagonism and linkage disequilibrium. _Evolution_ 64:3638–3642.
+
+Connallon, T., and S. F. Chenoweth. 2019. Dominance reversals and the maintenance of genetic variation for fitness. _PLoS Biology_ 17:e3000118.
+
+Dapper, A. L., A. E. Diegel, and M. J. Wade. 2023. Relative rates of evolution of male-beneficial nuclear compensatory mutations and male-harming Mother’s Curse mitochondrial alleles. _Evolution_ 77:1945-1955
+
 
 $~$
 
